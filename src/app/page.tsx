@@ -19,7 +19,7 @@ import {
 } from "@/components/tambo/thread-content";
 import { StrudelRepl } from "@/strudel/components/strudel-repl";
 import { LoadingScreen } from "@/components/loading/loading-screen";
-import { components, initialMessages, tools } from "@/lib/tambo";
+import { components, tools } from "@/lib/tambo";
 import { LoadingContextProvider } from "@/components/loading/context";
 import type { Suggestion, TamboThreadMessage } from "@tambo-ai/react";
 import { TamboProvider, useTamboThread, useTamboThreadList } from "@tambo-ai/react";
@@ -132,7 +132,6 @@ export default function Home() {
       apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
       tools={tools}
       components={components}
-      initialMessages={initialMessages}
     >
       <LoadingContextProvider>
         <StrudelProvider>
