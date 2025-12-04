@@ -313,7 +313,7 @@ export class StrudelService {
 
       let totalWeight = 0;
       let loadedWeight = 0;
-      const loadAndReport = async (p: Promise<any>, message: string, weight: number): Promise<any> => {
+      const loadAndReport = async <T>(p: Promise<T>, message: string, weight: number): Promise<T> => {
         totalWeight += weight;
         await p;
         loadedWeight += weight;
@@ -421,6 +421,14 @@ export class StrudelService {
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
+  }
+
+  /**
+   * Reset the editor to default code and stop playback
+   */
+  reset = (): void => {
+    this.stop();
+    this.setCode(DEFAULT_CODE);
   }
 
   // ============================================

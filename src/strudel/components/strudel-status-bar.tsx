@@ -1,10 +1,12 @@
 import { cn } from "@/lib/utils";
 import { useStrudel } from "@/strudel/context/strudel-provider";
-import { Play, Square } from "lucide-react";
+import { useTamboThread } from "@tambo-ai/react";
+import { Play, Square, RotateCcw } from "lucide-react";
 import React from "react";
 
 export function StrudelStatusBar() {
-  const { isPlaying, isReady, play, stop } = useStrudel();
+  const { isPlaying, isReady, play, stop, reset } = useStrudel();
+  const { startNewThread } = useTamboThread();
 
   const error = null; // Placeholder for error state
 
@@ -41,6 +43,18 @@ export function StrudelStatusBar() {
           <span className={isPlaying ? "text-primary" : ""}>
             {isPlaying ? "playing" : "stopped"}
           </span>
+          <span className="text-muted-foreground/50">|</span>
+          <button
+            onClick={() => {
+              reset();
+              startNewThread();
+            }}
+            disabled={!isReady}
+            className="flex items-center gap-1.5 disabled:opacity-30 text-muted-foreground hover:text-foreground"
+          >
+            <RotateCcw className="w-3 h-3" />
+            reset
+          </button>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-muted-foreground/60">

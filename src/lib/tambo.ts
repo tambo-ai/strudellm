@@ -6,10 +6,14 @@
  * before updating the REPL. If the code is invalid, the tool throws an error
  * back to the AI so it can fix the pattern.
  *
+ * NOTE: The system prompt (STRUDEL_SYSTEM_PROMPT) should be configured via
+ * the Tambo dashboard for the "strudel-ai" context key, not via initialMessages.
+ * This avoids conflicts when switching between existing threads.
+ *
  * Read more about Tambo at https://tambo.co/docs
  */
 
-import type { InitialTamboThreadMessage, TamboComponent, TamboTool } from "@tambo-ai/react";
+import type { TamboComponent, TamboTool } from "@tambo-ai/react";
 import { validateAndUpdateRepl } from "@/strudel/tools/validateAndUpdateRepl";
 import { listSamples } from "@/strudel/tools/listSamples";
 import { STRUDEL_SYSTEM_PROMPT } from "@/strudel/lib/prompt";
