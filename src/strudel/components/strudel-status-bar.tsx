@@ -5,22 +5,20 @@ import { Play, Square, RotateCcw, BotIcon } from "lucide-react";
 import React from "react";
 
 export function StrudelStatusBar() {
-  const { isPlaying, isReady, play, stop, reset, errors } = useStrudel();
+  const { isPlaying, isReady, play, stop, reset, error } = useStrudel();
   const { startNewThread, sendThreadMessage } = useTamboThread();
 
   const handleFixError = React.useCallback(() => {
     // Example fix: just clear errors and add a message to the thread
-    sendThreadMessage('Please fix the errors in my code.', { additionalContext: { errors }});
-  }, [errors, sendThreadMessage]);
+    sendThreadMessage('Please fix the errors in my code.', { additionalContext: { error }});
+  }, [error, sendThreadMessage]);
 
   return (
     <>
-      {errors.length > 0 && (
+      {error && (
         <div className="px-3 py-2 text-destructive border-t border-destructive/30">
           <div className="w-full"><button className="" onClick={handleFixError}><BotIcon /> Fix Error</button></div>
-          {errors.map((error, index) => (
-            <div key={index}>{error}</div>
-          ))}
+          <div>{error}</div>
         </div>
       )}
       <div className="px-3 py-1.5 border-t border-border text-muted-foreground flex items-center justify-between">

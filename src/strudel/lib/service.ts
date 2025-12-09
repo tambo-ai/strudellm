@@ -20,10 +20,6 @@ import { getDrawContext, setTheme } from "@strudel/draw";
 type LoadingCallback = (status: string, progress: number) => void;
 type CodeChangeCallback = (state: StrudelReplState) => void;
 
-interface StrudelServiceOptions {
-  storageKeyPrefix?: string;
-}
-
 const DEFAULT_CODE = `// Welcome to Strudel AI!
 // Write patterns here or ask the AI for help
 
@@ -31,11 +27,9 @@ const DEFAULT_CODE = `// Welcome to Strudel AI!
 s("bd sd bd sd")
 `;
 
-const DEFAULT_STORAGE_PREFIX = "strudel-ai-thread-";
-
 export class StrudelService {
   private static _instance: StrudelService | null = null;
-  
+
   // Audio engine state
   private isAudioInitialized = false;
 
@@ -44,28 +38,21 @@ export class StrudelService {
   private containerElement: HTMLElement | null = null;
   private editorOptions: Omit<StrudelMirrorOptions, 'root'> = {};
 
-  // Thread/persistence state
-  private currentThreadId: string | null = null;
-  private storageKeyPrefix: string;
-
   // Callbacks
   private loadingCallbacks: LoadingCallback[] = [];
   private stateChangeCallbacks: CodeChangeCallback[] = [];
-  private errorCallbacks: ((error: Error) => void)[] = [];
 
   // Repl state
   private _state: StrudelReplState = { code: DEFAULT_CODE, started: false } as StrudelReplState;
 
-  private constructor(options: StrudelServiceOptions = {}) {
-    this.storageKeyPrefix = options.storageKeyPrefix ?? DEFAULT_STORAGE_PREFIX;
-  }
+  private constructor() {}
 
   /**
    * Get or create the singleton instance
    */
-  static instance(options: StrudelServiceOptions = {}): StrudelService {
+  static instance(): StrudelService {
     if (!StrudelService._instance) {
-      StrudelService._instance = new StrudelService(options);
+      StrudelService._instance = new StrudelService();
     }
 
     return StrudelService._instance;
@@ -135,71 +122,6 @@ export class StrudelService {
   }
 
   // ============================================
-  // Code Persistence
-  // ============================================
-
-  private getStorageKey(threadId: string): string {
-    return `${this.storageKeyPrefix}${threadId}`;
-  }
-
-  /**
-   * Load saved code for a thread from localStorage
-   */
-  getSavedCode = (threadId?: string): string | null => {
-    if (typeof window === "undefined") return null;
-    const currentThreadId = threadId || this.currentThreadId;
-    if (!currentThreadId) return null;
-    try {
-      return localStorage.getItem(this.getStorageKey(currentThreadId));
-    } catch {
-      return null;
-    }
-  }
-
-  loadCode = (): void => {
-    if (typeof window === "undefined") return;
-    if (!this.currentThreadId) return;
-    if (!this.editorInstance) return;
-    
-    const savedCode = this.getSavedCode(this.currentThreadId) ?? DEFAULT_CODE;
-    this.setCode(savedCode);
-  }
-
-  /**
-   * Save code for a thread to localStorage
-   */
-  saveCode = (): void => {
-    if (typeof window === "undefined") return;
-    if (!this.currentThreadId) return;
-    if (this.currentThreadId.includes("placeholder")) return;
-    try {
-      localStorage.setItem(this.getStorageKey(this.currentThreadId), this._state.code.toString());
-    } catch {}
-  }
-
-  /**
-   * Set the current thread ID and load its saved code
-   */
-  setThreadId = (threadId: string | null): void => {
-    if (threadId === this.currentThreadId) {
-      return;
-    }
-
-    this.currentThreadId = threadId;
-
-    if (this.currentThreadId && this.editorInstance) {
-      this.loadCode();
-    }
-  }
-
-  /**
-   * Get the current thread ID
-   */
-  getThreadId = (): string | null => {
-    return this.currentThreadId;
-  }
-
-  // ============================================
   // State Change Callbacks
   // ============================================
 
@@ -222,10 +144,6 @@ export class StrudelService {
   private notifyStateChange(state: StrudelReplState): void {
     this._state = state;
     this.stateChangeCallbacks.forEach((cb) => cb(state));
-
-    if (this.currentThreadId) {
-      this.saveCode();
-    }
   }
 
   // ============================================
@@ -339,16 +257,12 @@ export class StrudelService {
 
     const oldEditor = this.editorInstance;
     this.containerElement = container;
-
-    // Determine initial code
-    this.loadCode();
-
     this.containerElement.innerHTML = "";
 
     // Create the editor
     this.editorInstance = new StrudelMirror({
       root: this.containerElement,
-      initialCode: this.getSavedCode() ?? DEFAULT_CODE,
+      initialCode: DEFAULT_CODE,
       transpiler,
       defaultOutput: webaudioOutput,
       getTime: () => getAudioContext().currentTime,
@@ -436,19 +350,6 @@ export class StrudelService {
     this.setCode(DEFAULT_CODE);
   }
 
-  onReplError(callback: (error: Error) => void): () => void {
-    this.errorCallbacks.push(callback);
-    return () => {
-      this.errorCallbacks = this.errorCallbacks.filter(
-        (cb) => cb !== callback
-      );
-    };
-  }
-
-  private notifyReplError(error: Error): void {
-    this.errorCallbacks.forEach((cb) => cb(error));
-  }
-
   // ============================================
   // Cleanup
   // ============================================
@@ -463,6 +364,5 @@ export class StrudelService {
     this.loadingCallbacks = [];
     this.stateChangeCallbacks = [];
     this.isAudioInitialized = false;
-    this.currentThreadId = null;
   }
 }

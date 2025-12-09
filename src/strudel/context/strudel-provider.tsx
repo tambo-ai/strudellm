@@ -6,19 +6,14 @@ import { StrudelReplState } from "@strudel/codemirror";
 import * as React from "react";
 
 type StrudelContextValue = {
-  // Define context value types here
   code: string,
-  setCode: (code: string, shouldEvaluate: boolean) => void,
-  errors: string[],
-  setError: (error: string | null) => void,
-  clearErrors: () => void,
+  error: string | null,
+  setCode: (code: string, shouldPlay?: boolean) => void,
   isPlaying: boolean,
   play: () => void,
   stop: () => void,
   reset: () => void,
-  setRoot: (el: HTMLDivElement) => void
-  getThreadId: () => string | null,
-  setThreadId: (threadId: string) => void,
+  setRoot: (el: HTMLDivElement) => void,
   isReady: boolean,
 };
 
@@ -27,8 +22,7 @@ export const StrudelContext = React.createContext<StrudelContextValue | null>(nu
 const strudelService = StrudelService.instance();
 
 export function StrudelProvider({ children }: { children: React.ReactNode }) {
-  const { state, setMessage, setProgress, setState } = useLoadingContext();
-  const [errors, setErrors] = React.useState<string[]>([]);
+  const { setMessage, setProgress, setState } = useLoadingContext();
   const [replState, setReplState] = React.useState<StrudelReplState | null>(() => {
     return strudelService.getReplState();
   });
@@ -47,9 +41,6 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
 
     const replUnsubscribe = strudelService.onStateChange((newState) => {
       setReplState((state) => {
-        if (!state?.evalError) {
-          setErrors([]);
-        }
         return { ...state, ...newState }
       });
     });
@@ -65,12 +56,6 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
     };
   }, [setMessage, setProgress, setReplState, setState]);
 
-  React.useEffect(() => {
-    return strudelService.onReplError((error: Error) => {
-      setErrors((prev) => [...prev, error.message]);
-    });
-  }, []);
-
   const setRoot = React.useCallback((el: HTMLDivElement) => {
     strudelService.attach(el);
 
@@ -79,31 +64,27 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  const setCode = React.useCallback((code: string, shouldPlay: boolean = false) => {
+    strudelService.setCode(code);
+    if (shouldPlay) {
+      strudelService.play();
+    }
+  }, []);
+
   const providerValue: StrudelContextValue = React.useMemo(() => {
-    const { started: isPlaying, code } = replState || { started: false, code: '' };
+    const { started: isPlaying, code, evalError, schedulerError } = replState || { started: false, code: '' };
     return {
       code,
+      error: evalError || schedulerError || null,
       isPlaying,
-      errors,
-      setError: (error: string | null) => {
-        if (error) {
-          setErrors((prev) => [...prev, error]);
-        }
-      },
-      clearErrors: () => {
-        setErrors([]);
-      },
-      state,
-      setCode: strudelService.setCode,
-      play: async () => await strudelService.play,
+      setCode,
+      play: async () => await strudelService.play(),
       stop: strudelService.stop,
       reset: strudelService.reset,
       setRoot,
-      getThreadId: strudelService.getThreadId,
-      setThreadId: strudelService.setThreadId,
       isReady: strudelService.isReady,
     }
-  }, [setRoot, replState, state, errors]);
+  }, [setRoot, setCode, replState]);
 
   return (
     <StrudelContext.Provider value={providerValue}>{children}</StrudelContext.Provider>
