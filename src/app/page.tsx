@@ -17,6 +17,13 @@ import {
   ThreadContent,
   ThreadContentMessages,
 } from "@/components/tambo/thread-content";
+import {
+  ThreadHistory,
+  ThreadHistoryHeader,
+  ThreadHistoryNewButton,
+  ThreadHistorySearch,
+  ThreadHistoryList,
+} from "@/components/tambo/thread-history";
 import { StrudelRepl } from "@/strudel/components/strudel-repl";
 import { LoadingScreen } from "@/components/loading/loading-screen";
 import { ApiKeyMissing } from "@/components/api-key-missing";
@@ -47,7 +54,40 @@ const strudelContextHelper = () => {
   };
 };
 
-const CONTEXT_KEY = "strudel-ai";
+// Storage keys
+const CONTEXT_KEY_STORAGE = "strudel-ai-context-key";
+const CODE_STORAGE_PREFIX = "strudel-code-";
+
+// Get or create user-specific context key (persists across sessions)
+const getOrCreateContextKey = (): string => {
+  if (typeof window === "undefined") return "";
+
+  let contextKey = localStorage.getItem(CONTEXT_KEY_STORAGE);
+  if (!contextKey) {
+    contextKey = `strudel-ai-${crypto.randomUUID()}`;
+    localStorage.setItem(CONTEXT_KEY_STORAGE, contextKey);
+  }
+  return contextKey;
+};
+
+// Helper functions for code persistence
+const saveCodeForThread = (threadId: string, code: string) => {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(CODE_STORAGE_PREFIX + threadId, code);
+  } catch {
+    // Ignore storage errors
+  }
+};
+
+const loadCodeForThread = (threadId: string): string | null => {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(CODE_STORAGE_PREFIX + threadId);
+  } catch {
+    return null;
+  }
+};
 
 const strudelSuggestions: Suggestion[] = [
   {
@@ -72,30 +112,55 @@ const strudelSuggestions: Suggestion[] = [
 
 function AppContent() {
   const [threadInitialized, setThreadInitialized] = React.useState(false);
+  const [contextKey] = React.useState(getOrCreateContextKey);
   const { isPending } = useLoadingState();
-  const { isReady: strudelIsReady, setThreadId } = useStrudel();
+  const { isReady: strudelIsReady, setCode, code } = useStrudel();
   const { thread, startNewThread, switchCurrentThread } = useTamboThread();
-  const { data: threadList, isSuccess: threadListLoaded } = useTamboThreadList({ contextKey: CONTEXT_KEY });
+  const { data: threadList, isSuccess: threadListLoaded } = useTamboThreadList({
+    contextKey,
+  });
 
-  // Load existing thread or create new one when app starts
+  // Track previous thread to save code before switching
+  const prevThreadRef = React.useRef<string | null>(null);
+
+  // Initialize: select most recent thread or create new
   React.useEffect(() => {
     if (!strudelIsReady || !threadListLoaded || threadInitialized) return;
 
     const existingThreads = threadList?.items ?? [];
     if (existingThreads.length > 0) {
-      const mostRecentThread = existingThreads[0];
-      switchCurrentThread(mostRecentThread.id, true);
+      switchCurrentThread(existingThreads[0].id, true);
     } else {
       startNewThread();
     }
     setThreadInitialized(true);
-  }, [strudelIsReady, threadListLoaded, threadList, threadInitialized, switchCurrentThread, startNewThread]);
+  }, [strudelIsReady, threadListLoaded, threadInitialized, threadList, switchCurrentThread, startNewThread]);
 
+  // On thread change: save old code, load new code
   React.useEffect(() => {
-    if (thread) {
-      setThreadId(thread.id);
+    if (!thread || !strudelIsReady) return;
+
+    // Save code from previous thread
+    if (prevThreadRef.current && prevThreadRef.current !== thread.id && code) {
+      saveCodeForThread(prevThreadRef.current, code);
     }
-  }, [thread, setThreadId]);
+
+    // Load code for new thread (only if switching to a different thread)
+    if (prevThreadRef.current !== thread.id) {
+      const savedCode = loadCodeForThread(thread.id);
+      if (savedCode) {
+        setCode(savedCode, false); // Load but don't play
+      }
+    }
+
+    prevThreadRef.current = thread.id;
+  }, [thread, strudelIsReady, code, setCode]);
+
+  // Auto-save current code on change
+  React.useEffect(() => {
+    if (!thread || !code) return;
+    saveCodeForThread(thread.id, code);
+  }, [thread, code]);
 
   if (isPending || !strudelIsReady || !thread) {
     return <LoadingScreen />;
@@ -126,7 +191,7 @@ function AppContent() {
 
           {/* Input */}
           <div className="p-3 border-t border-border">
-            <MessageInput contextKey={CONTEXT_KEY}>
+            <MessageInput contextKey={contextKey}>
               <MessageInputTextarea placeholder=">" />
               <MessageInputToolbar>
                 <MessageInputNewThreadButton />
@@ -137,6 +202,18 @@ function AppContent() {
           </div>
         </SidebarContent>
       </Sidebar>
+
+      {/* Thread History Sidebar */}
+      <ThreadHistory
+        contextKey={contextKey}
+        position="right"
+        defaultCollapsed={true}
+      >
+        <ThreadHistoryHeader />
+        <ThreadHistoryNewButton />
+        <ThreadHistorySearch />
+        <ThreadHistoryList />
+      </ThreadHistory>
     </Frame>
   );
 }
@@ -149,20 +226,20 @@ export default function Home() {
   }
 
   return (
-    <TamboProvider
-      tamboUrl={process.env.NEXT_PUBLIC_TAMBO_URL}
-      apiKey={apiKey}
-      tools={tools}
-      components={components}
-      contextHelpers={{
-        strudelState: strudelContextHelper,
-      }}
-    >
-      <LoadingContextProvider>
-        <StrudelProvider>
+    <LoadingContextProvider>
+      <StrudelProvider>
+        <TamboProvider
+          tamboUrl={process.env.NEXT_PUBLIC_TAMBO_URL}
+          apiKey={apiKey}
+          tools={tools}
+          components={components}
+          contextHelpers={{
+            strudelState: strudelContextHelper,
+          }}
+        >
           <AppContent />
-        </StrudelProvider>
-      </LoadingContextProvider>
-    </TamboProvider>
+        </TamboProvider>
+      </StrudelProvider>
+    </LoadingContextProvider>
   );
 }

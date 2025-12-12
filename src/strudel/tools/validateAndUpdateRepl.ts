@@ -1,6 +1,6 @@
 import { StrudelService } from "@/strudel/lib/service";
 import { TamboTool } from "@tambo-ai/react";
-import { z } from "zod";
+import { z } from "zod/v3";
 
 const service = StrudelService.instance();
 
@@ -72,7 +72,7 @@ export const validateAndUpdateRepl: TamboTool = {
     "Update the Strudel REPL with new pattern code. The code is validated by running it through Strudel's evaluator first. If the code is invalid, the tool will fail with the exact error message from the evaluator. Fix the error and try again. Make sure the code and sequences are in the same key/scale and don't produce anything that will sound dissonant.",
   tool: async (
     code: string
-  ): Promise<string> => {
+  ): Promise<{ success: boolean, code?: string, error?: string }> => {
     await service.init();
 
     // First check for missing samples before evaluating
@@ -80,20 +80,13 @@ export const validateAndUpdateRepl: TamboTool = {
     if (sampleNames.length > 0) {
       const missingSamples = await validateSamples(sampleNames);
       if (missingSamples.length > 0) {
-        return `Error: Unknown sample(s): ${missingSamples.join(', ')}. Use the listSamples tool to see available sounds.\n\nCode:\n${code}`;
+        return { success: false, error: `Error: Unknown sample(s): ${missingSamples.join(', ')}. Use the listSamples tool to see available sounds.\n\nCode:\n${code}` };
       }
     }
 
     const result = await service.updateAndPlay(code);
 
-    if (!result.success) {
-      const errorMessage = result.error || 'Unknown error';
-      // Return error as a string instead of throwing to avoid console noise
-      // The AI will see this as the tool result and can fix the code
-      return `Error: Strudel evaluation failed: ${errorMessage}\n\nCode:\n${code}`;
-    }
-
-    return "Pattern updated successfully";
+    return result;
   },
   toolSchema: z
     .function()

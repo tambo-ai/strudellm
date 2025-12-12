@@ -34,7 +34,6 @@ import {
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import * as React from "react";
-// eslint-disable-next-line @typescript-eslint/promise-function-async
 const DictationButton = dynamic(() => import("./dictation-button"), {
   ssr: false,
 });
@@ -956,7 +955,7 @@ const ImageContextBadge: React.FC<ImageContextBadgeProps> = ({
   onToggle,
   onRemove,
 }) => (
-  <div className="relative group flex-shrink-0">
+  <div className="relative group shrink-0">
     <button
       type="button"
       onClick={onToggle}
@@ -983,7 +982,7 @@ const ImageContextBadge: React.FC<ImageContextBadgeProps> = ({
               unoptimized
               className="object-cover"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+            <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent" />
             <div className="absolute bottom-1 left-2 right-2 text-white text-xs font-medium truncate">
               {displayName}
             </div>
@@ -996,7 +995,7 @@ const ImageContextBadge: React.FC<ImageContextBadgeProps> = ({
           isExpanded ? "opacity-0" : "opacity-100 delay-100",
         )}
       >
-        <ImageIcon className="w-3.5 h-3.5 flex-shrink-0" />
+        <ImageIcon className="w-3.5 h-3.5 shrink-0" />
         <span className="truncate">{displayName}</span>
       </span>
     </button>

@@ -1,5 +1,5 @@
 import { TamboTool } from "@tambo-ai/react";
-import { z } from "zod";
+import { z } from "zod/v3";
 
 /**
  * listSamples tool

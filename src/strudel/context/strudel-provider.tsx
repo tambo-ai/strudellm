@@ -1,18 +1,19 @@
+"use client";
+
 import { useLoadingContext } from "@/components/loading/context";
 import { StrudelService } from "@/strudel/lib/service";
 import { StrudelReplState } from "@strudel/codemirror";
 import * as React from "react";
 
 type StrudelContextValue = {
-  // Define context value types here
   code: string,
-  setCode: (code: string, shouldEvaluate: boolean) => void,
+  error: string | null,
+  setCode: (code: string, shouldPlay?: boolean) => void,
   isPlaying: boolean,
   play: () => void,
   stop: () => void,
   reset: () => void,
   setRoot: (el: HTMLDivElement) => void,
-  setThreadId: (threadId: string) => void,
   isReady: boolean,
 };
 
@@ -53,7 +54,7 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
       loadingUnsubscribe();
       replUnsubscribe();
     };
-  }, [strudelService, setReplState]);
+  }, [setMessage, setProgress, setReplState, setState]);
 
   const setRoot = React.useCallback((el: HTMLDivElement) => {
     strudelService.attach(el);
@@ -61,22 +62,29 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
     return () => {
       strudelService.detach();
     };
-  }, [strudelService]);
+  }, []);
+
+  const setCode = React.useCallback((code: string, shouldPlay: boolean = false) => {
+    strudelService.setCode(code);
+    if (shouldPlay) {
+      strudelService.play();
+    }
+  }, []);
 
   const providerValue: StrudelContextValue = React.useMemo(() => {
-    const { started: isPlaying, code } = replState || { started: false, code: '' };
+    const { started: isPlaying, code, evalError, schedulerError } = replState || { started: false, code: '' };
     return {
       code,
+      error: evalError || schedulerError || null,
       isPlaying,
-      setCode: strudelService.setCode,
-      play: strudelService.play,
+      setCode,
+      play: async () => await strudelService.play(),
       stop: strudelService.stop,
       reset: strudelService.reset,
       setRoot,
-      setThreadId: strudelService.setThreadId,
       isReady: strudelService.isReady,
     }
-  }, [setRoot, strudelService.isReady, replState, strudelService]);
+  }, [setRoot, setCode, replState]);
 
   return (
     <StrudelContext.Provider value={providerValue}>{children}</StrudelContext.Provider>

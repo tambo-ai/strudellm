@@ -1,10 +1,11 @@
+"use client";
+
 /**
  * Strudel Service V2
  *
  * Singleton service that manages all Strudel functionality:
  * - Audio engine initialization
  * - Code evaluation and playback
- * - Code persistence (save/load per thread)
  * - StrudelMirror editor attachment and configuration
  */
 
@@ -18,10 +19,6 @@ import { getDrawContext, setTheme } from "@strudel/draw";
 type LoadingCallback = (status: string, progress: number) => void;
 type CodeChangeCallback = (state: StrudelReplState) => void;
 
-interface StrudelServiceOptions {
-  storageKeyPrefix?: string;
-}
-
 const DEFAULT_CODE = `// Welcome to Strudel AI!
 // Write patterns here or ask the AI for help
 
@@ -29,11 +26,9 @@ const DEFAULT_CODE = `// Welcome to Strudel AI!
 s("bd sd bd sd")
 `;
 
-const DEFAULT_STORAGE_PREFIX = "strudel-ai-thread-";
-
 export class StrudelService {
   private static _instance: StrudelService | null = null;
-  
+
   // Audio engine state
   private isAudioInitialized = false;
 
@@ -42,25 +37,21 @@ export class StrudelService {
   private containerElement: HTMLElement | null = null;
   private editorOptions: Omit<StrudelMirrorOptions, 'root'> = {};
 
-  // Thread/persistence state
-  private currentThreadId: string | null = null;
-  private storageKeyPrefix: string;
-
   // Callbacks
   private loadingCallbacks: LoadingCallback[] = [];
   private stateChangeCallbacks: CodeChangeCallback[] = [];
+
+  // Repl state
   private _state: StrudelReplState = { code: DEFAULT_CODE, started: false } as StrudelReplState;
 
-  private constructor(options: StrudelServiceOptions = {}) {
-    this.storageKeyPrefix = options.storageKeyPrefix ?? DEFAULT_STORAGE_PREFIX;
-  }
+  private constructor() {}
 
   /**
    * Get or create the singleton instance
    */
-  static instance(options: StrudelServiceOptions = {}): StrudelService {
+  static instance(): StrudelService {
     if (!StrudelService._instance) {
-      StrudelService._instance = new StrudelService(options);
+      StrudelService._instance = new StrudelService();
     }
 
     return StrudelService._instance;
@@ -85,7 +76,7 @@ export class StrudelService {
    */
   onLoadingProgress(callback: LoadingCallback): () => void {
     this.loadingCallbacks.push(callback);
-    
+
     // Immediately notify if already initialized
     if (this.isReady) {
       callback("Ready", 100);
@@ -108,7 +99,7 @@ export class StrudelService {
 
   async init(): Promise<void> {
     if (this.isReady) return;
-    
+
     await this.attach(document.createElement("div"));
 
     // @ts-expect-error -- expose for debugging
@@ -127,76 +118,6 @@ export class StrudelService {
    */
   get isPlaying(): boolean {
     return this.editorInstance?.repl.scheduler.started || false;
-  }
-
-  // ============================================
-  // Code Persistence
-  // ============================================
-
-  private getStorageKey(threadId: string): string {
-    return `${this.storageKeyPrefix}${threadId}`;
-  }
-
-  /**
-   * Load saved code for a thread from localStorage
-   */
-  getSavedCode = (threadId?: string): string | null => {
-    if (typeof window === "undefined") return null;
-    const currentThreadId = threadId || this.currentThreadId;
-    if (!currentThreadId) return null;
-    try {
-      return localStorage.getItem(this.getStorageKey(currentThreadId));
-    } catch {
-      return null;
-    }
-  }
-
-  loadCode = (): void => {
-    if (typeof window === "undefined") return;
-    if (!this.currentThreadId) return;
-    if (!this.editorInstance) return;
-
-    const savedCode = this.getSavedCode(this.currentThreadId) ?? DEFAULT_CODE;
-
-    // Update internal state immediately to prevent flash of old content
-    this._state = { ...this._state, code: savedCode };
-    this.stateChangeCallbacks.forEach((cb) => cb(this._state));
-
-    this.setCode(savedCode);
-  }
-
-  /**
-   * Save code for a thread to localStorage
-   */
-  saveCode = (): void => {
-    if (typeof window === "undefined") return;
-    if (!this.currentThreadId) return;
-    if (this.currentThreadId.includes("placeholder")) return;
-    try {
-      localStorage.setItem(this.getStorageKey(this.currentThreadId), this._state.code.toString());
-    } catch {}
-  }
-
-  /**
-   * Set the current thread ID and load its saved code
-   */
-  setThreadId = (threadId: string | null): void => {
-    if (threadId === this.currentThreadId) {
-      return;
-    }
-
-    this.currentThreadId = threadId;
-
-    if (this.currentThreadId && this.editorInstance) {
-      this.loadCode();
-    }
-  }
-
-  /**
-   * Get the current thread ID
-   */
-  getThreadId(): string | null {
-    return this.currentThreadId;
   }
 
   // ============================================
@@ -222,10 +143,6 @@ export class StrudelService {
   private notifyStateChange(state: StrudelReplState): void {
     this._state = state;
     this.stateChangeCallbacks.forEach((cb) => cb(state));
-
-    if (this.currentThreadId) {
-      this.saveCode();
-    }
   }
 
   // ============================================
@@ -294,10 +211,42 @@ export class StrudelService {
     setTheme(themeSettings);
   }
 
+  prebake = async (): Promise<void> => {
+    initAudioOnFirstClick(); // needed to make the browser happy (don't await this here..)
+
+    let totalWeight = 0;
+    let loadedWeight = 0;
+    const loadAndReport = async <T>(p: Promise<T>, message: string, weight: number): Promise<T> => {
+      totalWeight += weight;
+      await p;
+      loadedWeight += weight;
+      const progress = Math.floor((loadedWeight / totalWeight) * 100);
+      this.notifyLoading(message, progress);
+      return p;
+    };
+
+    const core = loadAndReport(import('@strudel/core'), "Loaded core module", 20);
+    const draw = loadAndReport(import('@strudel/draw'), "Loaded draw module", 20);
+    const mini = loadAndReport(import('@strudel/mini'), "Loaded mini module", 20);
+    const tonal = loadAndReport(import('@strudel/tonal'), "Loaded tonal module", 20);
+    const webAudio = loadAndReport(import('@strudel/webaudio'), "Loaded webaudio module", 20);
+    const loadModules = evalScope(core, draw, mini, tonal, webAudio);
+
+    const sampleList = prebake().map(([name, sample]) => {
+      return loadAndReport(sample, `Loaded sample: ${name}`, 30);
+    });
+
+    const synthSounds = loadAndReport(registerSynthSounds(), "Loaded synth sounds", 30);
+
+    await Promise.all([loadModules, synthSounds, ...sampleList]);
+
+    this.isAudioInitialized = true;
+  }
+
   /**
    * Attach the StrudelMirror editor to an HTML element
    */
-  async attach(container: HTMLElement): Promise<void> {
+  attach = async (container: HTMLElement): Promise<void> => {
     const { StrudelMirror } = await import("@strudel/codemirror");
 
     // If already attached to this container, do nothing
@@ -309,46 +258,10 @@ export class StrudelService {
     this.containerElement = container;
     this.containerElement.innerHTML = "";
 
-    const prebakePromise = async () => {
-      initAudioOnFirstClick(); // needed to make the browser happy (don't await this here..)
-
-      let totalWeight = 0;
-      let loadedWeight = 0;
-      const loadAndReport = async <T>(p: Promise<T>, message: string, weight: number): Promise<T> => {
-        totalWeight += weight;
-        await p;
-        loadedWeight += weight;
-        const progress = Math.floor((loadedWeight / totalWeight) * 100);
-        this.notifyLoading(message, progress);
-        return p;
-      };
-
-      const core = loadAndReport(import('@strudel/core'), "Loaded core module", 20);
-      const draw = loadAndReport(import('@strudel/draw'), "Loaded draw module", 20);
-      const mini = loadAndReport(import('@strudel/mini'), "Loaded mini module", 20);
-      const tonal = loadAndReport(import('@strudel/tonal'), "Loaded tonal module", 20);
-      const webAudio = loadAndReport(import('@strudel/webaudio'), "Loaded webaudio module", 20);
-      const loadModules = evalScope(core, draw, mini, tonal, webAudio);
-
-      const sampleList = prebake().map(([name, sample]) => {
-        return loadAndReport(sample, `Loaded sample: ${name}`, 30);
-      });
-      
-      const synthSounds = loadAndReport(registerSynthSounds(), "Loaded synth sounds", 30);
-      
-      await Promise.all([loadModules, synthSounds, ...sampleList]);
-      this.isAudioInitialized = true;
-      this.notifyLoading("Ready", 100);
-
-      if (oldEditor) {
-        oldEditor.dispose?.();
-      }
-    }
-
     // Create the editor
-    const editor = new StrudelMirror({
+    this.editorInstance = new StrudelMirror({
       root: this.containerElement,
-      initialCode: this.getSavedCode() ?? DEFAULT_CODE,
+      initialCode: DEFAULT_CODE,
       transpiler,
       defaultOutput: webaudioOutput,
       getTime: () => getAudioContext().currentTime,
@@ -357,23 +270,22 @@ export class StrudelService {
       onUpdateState: (state) => {
         this.notifyStateChange(state);
       },
-      prebake: prebakePromise,
+      prebake: this.prebake,
     });
-    
-    await prebakePromise();
 
-    this.editorInstance = editor;
+    await this.prebake();
+
+    if (oldEditor) {
+      oldEditor.dispose?.();
+    }
 
     // Sync the REPL's internal state with the editor's actual code
     // This is necessary because StrudelMirror doesn't sync initialCode to repl.state
     this.editorInstance.repl.setCode(this.editorInstance.code);
 
-    // Load thread-specific code if we have a threadId
-    if (this.currentThreadId) {
-      this.loadCode();
-    }
-
     this.fixTheme();
+    this.notifyLoading("Ready", 100);
+    this.notifyStateChange(this.editorInstance.repl.state);
   }
 
   /**
@@ -402,10 +314,10 @@ export class StrudelService {
   // Playback Control
   // ============================================
 
-  play = (): void => {
-    this.editorInstance?.evaluate();
+  play = async (): Promise<void> => {
+    return await this.editorInstance?.evaluate();
   }
-  
+
   stop = (): void => {
     this.editorInstance?.repl.stop();
   }
@@ -425,9 +337,8 @@ export class StrudelService {
     code: string
   ) => {
     try {
-      await this.evaluate(code);
       await this.setCode(code);
-      this.play();
+      await this.play();
       return { success: true, code };
     } catch (error) {
       return { success: false, error: (error as Error).message };
@@ -456,6 +367,5 @@ export class StrudelService {
     this.loadingCallbacks = [];
     this.stateChangeCallbacks = [];
     this.isAudioInitialized = false;
-    this.currentThreadId = null;
   }
 }

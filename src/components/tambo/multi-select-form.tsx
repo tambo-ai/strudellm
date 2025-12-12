@@ -3,7 +3,7 @@
 import { cn } from "@/lib/utils";
 import { useTamboComponentState, useTamboStreamStatus } from "@tambo-ai/react";
 import * as React from "react";
-import { z } from "zod";
+import { z } from "zod/v3";
 
 const selectionGroupSchema = z.object({
   label: z.string().describe("The label/title for this group"),

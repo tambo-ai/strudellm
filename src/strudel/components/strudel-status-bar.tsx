@@ -1,20 +1,24 @@
 import { cn } from "@/lib/utils";
 import { useStrudel } from "@/strudel/context/strudel-provider";
 import { useTamboThread } from "@tambo-ai/react";
-import { Play, Square, RotateCcw } from "lucide-react";
+import { Play, Square, RotateCcw, BotIcon } from "lucide-react";
 import React from "react";
 
 export function StrudelStatusBar() {
-  const { isPlaying, isReady, play, stop, reset } = useStrudel();
-  const { startNewThread } = useTamboThread();
+  const { isPlaying, isReady, play, stop, reset, error } = useStrudel();
+  const { startNewThread, sendThreadMessage } = useTamboThread();
 
-  const error = null; // Placeholder for error state
+  const handleFixError = React.useCallback(() => {
+    // Example fix: just clear errors and add a message to the thread
+    sendThreadMessage('Please fix the errors in my code.', { additionalContext: { error }});
+  }, [error, sendThreadMessage]);
 
   return (
     <>
       {error && (
         <div className="px-3 py-2 text-destructive border-t border-destructive/30">
-          {error}
+          <div className="w-full"><button className="" onClick={handleFixError}><BotIcon /> Fix Error</button></div>
+          <div>{error}</div>
         </div>
       )}
       <div className="px-3 py-1.5 border-t border-border text-muted-foreground flex items-center justify-between">
