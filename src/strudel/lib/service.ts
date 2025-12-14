@@ -11,9 +11,18 @@
 
 import { evalScope } from "@strudel/core";
 import { transpiler } from "@strudel/transpiler";
-import { getAudioContext, initAudioOnFirstClick, registerSynthSounds, webaudioOutput } from "@strudel/webaudio";
+import {
+  getAudioContext,
+  initAudioOnFirstClick,
+  registerSynthSounds,
+  webaudioOutput,
+} from "@strudel/webaudio";
 import { prebake } from "@/strudel/lib/prebake";
-import { StrudelMirror, StrudelMirrorOptions, StrudelReplState } from "@strudel/codemirror";
+import {
+  StrudelMirror,
+  StrudelMirrorOptions,
+  StrudelReplState,
+} from "@strudel/codemirror";
 import { getDrawContext, setTheme } from "@strudel/draw";
 
 type LoadingCallback = (status: string, progress: number) => void;
@@ -35,14 +44,17 @@ export class StrudelService {
   // Editor state
   private editorInstance: StrudelMirror | null = null;
   private containerElement: HTMLElement | null = null;
-  private editorOptions: Omit<StrudelMirrorOptions, 'root'> = {};
+  private editorOptions: Omit<StrudelMirrorOptions, "root"> = {};
 
   // Callbacks
   private loadingCallbacks: LoadingCallback[] = [];
   private stateChangeCallbacks: CodeChangeCallback[] = [];
 
   // Repl state
-  private _state: StrudelReplState = { code: DEFAULT_CODE, started: false } as StrudelReplState;
+  private _state: StrudelReplState = {
+    code: DEFAULT_CODE,
+    started: false,
+  } as StrudelReplState;
 
   // Thread/persistence state
   private currentThreadId: string | null = null;
@@ -89,7 +101,7 @@ export class StrudelService {
 
     return () => {
       this.loadingCallbacks = this.loadingCallbacks?.filter(
-        (cb) => cb !== callback
+        (cb) => cb !== callback,
       );
     };
   }
@@ -145,7 +157,7 @@ export class StrudelService {
     try {
       localStorage.setItem(
         StrudelService.STORAGE_PREFIX + this.currentThreadId,
-        this._state.code
+        this._state.code,
       );
     } catch {
       // Ignore storage errors
@@ -180,19 +192,19 @@ export class StrudelService {
 
   getReplState = (): StrudelReplState => {
     return this._state;
-  }
+  };
 
   /**
    * Register a callback to receive state change notifications
    */
-  onStateChange= (callback: CodeChangeCallback): () => void => {
+  onStateChange = (callback: CodeChangeCallback): (() => void) => {
     this.stateChangeCallbacks.push(callback);
     return () => {
       this.stateChangeCallbacks = this.stateChangeCallbacks.filter(
-        (cb) => cb !== callback
+        (cb) => cb !== callback,
       );
     };
-  }
+  };
 
   private notifyStateChange(state: StrudelReplState): void {
     this._state = state;
@@ -243,17 +255,18 @@ export class StrudelService {
   }
 
   fixTheme(): void {
-   const themeSettings = {
-      background: 'var(--card-background)',
-      foreground: 'var(--card-foreground)',
-      caret: 'var(--muted-foreground)',
-      selection: 'color-mix(in oklch, var(--primary) 20%, transparent)',
-      selectionMatch: 'color-mix(in oklch, var(--primary) 20%, transparent)',
-      lineHighlight: 'color-mix(in oklch, var(--primary) 20%, transparent)',
-      lineBackground: 'color-mix(in oklch, var(--card-foreground) 20%, transparent)',
-      gutterBackground: 'transparent',
-      gutterForeground: 'var(--muted-foreground)',
-    }
+    const themeSettings = {
+      background: "var(--card-background)",
+      foreground: "var(--card-foreground)",
+      caret: "var(--muted-foreground)",
+      selection: "color-mix(in oklch, var(--primary) 20%, transparent)",
+      selectionMatch: "color-mix(in oklch, var(--primary) 20%, transparent)",
+      lineHighlight: "color-mix(in oklch, var(--primary) 20%, transparent)",
+      lineBackground:
+        "color-mix(in oklch, var(--card-foreground) 20%, transparent)",
+      gutterBackground: "transparent",
+      gutterForeground: "var(--muted-foreground)",
+    };
     const styleID = "strudel-theme-vars";
     let styleEl = document.getElementById(styleID) as HTMLStyleElement | null;
     if (!styleEl) {
@@ -265,7 +278,7 @@ export class StrudelService {
       ${Object.entries(themeSettings)
         // important to override fallback
         .map(([key, value]) => `--${key}: ${value};`)
-        .join('\n')}
+        .join("\n")}
     }`;
     setTheme(themeSettings);
   }
@@ -275,7 +288,11 @@ export class StrudelService {
 
     let totalWeight = 0;
     let loadedWeight = 0;
-    const loadAndReport = async <T>(p: Promise<T>, message: string, weight: number): Promise<T> => {
+    const loadAndReport = async <T>(
+      p: Promise<T>,
+      message: string,
+      weight: number,
+    ): Promise<T> => {
       totalWeight += weight;
       await p;
       loadedWeight += weight;
@@ -284,23 +301,47 @@ export class StrudelService {
       return p;
     };
 
-    const core = loadAndReport(import('@strudel/core'), "Loaded core module", 20);
-    const draw = loadAndReport(import('@strudel/draw'), "Loaded draw module", 20);
-    const mini = loadAndReport(import('@strudel/mini'), "Loaded mini module", 20);
-    const tonal = loadAndReport(import('@strudel/tonal'), "Loaded tonal module", 20);
-    const webAudio = loadAndReport(import('@strudel/webaudio'), "Loaded webaudio module", 20);
+    const core = loadAndReport(
+      import("@strudel/core"),
+      "Loaded core module",
+      20,
+    );
+    const draw = loadAndReport(
+      import("@strudel/draw"),
+      "Loaded draw module",
+      20,
+    );
+    const mini = loadAndReport(
+      import("@strudel/mini"),
+      "Loaded mini module",
+      20,
+    );
+    const tonal = loadAndReport(
+      import("@strudel/tonal"),
+      "Loaded tonal module",
+      20,
+    );
+    const webAudio = loadAndReport(
+      import("@strudel/webaudio"),
+      "Loaded webaudio module",
+      20,
+    );
     const loadModules = evalScope(core, draw, mini, tonal, webAudio);
 
     const sampleList = prebake().map(([name, sample]) => {
       return loadAndReport(sample, `Loaded sample: ${name}`, 30);
     });
 
-    const synthSounds = loadAndReport(registerSynthSounds(), "Loaded synth sounds", 30);
+    const synthSounds = loadAndReport(
+      registerSynthSounds(),
+      "Loaded synth sounds",
+      30,
+    );
 
     await Promise.all([loadModules, synthSounds, ...sampleList]);
 
     this.isAudioInitialized = true;
-  }
+  };
 
   /**
    * Attach the StrudelMirror editor to an HTML element
@@ -362,7 +403,7 @@ export class StrudelService {
     }
     this.notifyLoading("Ready", 100);
     this.notifyStateChange(this.editorInstance.repl.state);
-  }
+  };
 
   /**
    * Detach the editor from its container
@@ -392,26 +433,26 @@ export class StrudelService {
 
   play = async (): Promise<void> => {
     return await this.editorInstance?.evaluate();
-  }
+  };
 
   stop = (): void => {
     this.editorInstance?.repl.stop();
-  }
+  };
 
   evaluate = async (code: string, play: boolean = false): Promise<void> => {
     const result = await this.editorInstance?.repl.evaluate(code, play);
     if (!result) {
-      throw new Error(`Evaluation failed: ${this.editorInstance?.repl.state.evalError}`);
+      throw new Error(
+        `Evaluation failed: ${this.editorInstance?.repl.state.evalError}`,
+      );
     }
-  }
+  };
 
   /**
    * Update the editor with new code and optionally play it
    * Used by external tools (like AI-generated updates)
    */
-  updateAndPlay = async (
-    code: string
-  ) => {
+  updateAndPlay = async (code: string) => {
     try {
       await this.setCode(code);
       await this.play();
@@ -419,7 +460,7 @@ export class StrudelService {
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
-  }
+  };
 
   /**
    * Reset the editor to default code and stop playback
@@ -427,7 +468,7 @@ export class StrudelService {
   reset = (): void => {
     this.stop();
     this.setCode(DEFAULT_CODE);
-  }
+  };
 
   // ============================================
   // Cleanup
