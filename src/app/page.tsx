@@ -26,6 +26,7 @@ import {
 } from "@/components/tambo/thread-history";
 import { StrudelRepl } from "@/strudel/components/strudel-repl";
 import { LoadingScreen } from "@/components/loading/loading-screen";
+import { ApiKeyMissing } from "@/components/api-key-missing";
 import { components, tools } from "@/lib/tambo";
 import { LoadingContextProvider } from "@/components/loading/context";
 import type { Suggestion } from "@tambo-ai/react";
@@ -37,10 +38,24 @@ import { Sidebar, SidebarContent } from "@/components/layout/sidebar";
 import { useLoadingContext as useLoadingState } from "@/components/loading/context";
 import { StrudelProvider, useStrudel } from "@/strudel/context/strudel-provider";
 import { StrudelStatusBar } from "@/strudel/components/strudel-status-bar";
+import { StrudelService } from "@/strudel/lib/service";
 
-// Storage keys
+/**
+ * Context helper that provides the current Strudel REPL state to the AI.
+ * This allows the AI to see what code is currently in the editor.
+ */
+const strudelContextHelper = () => {
+  const service = StrudelService.instance();
+  const state = service.getReplState();
+
+  return {
+    currentCode: state?.code ?? "",
+    isPlaying: state?.started ?? false,
+  };
+};
+
+// Storage key for context
 const CONTEXT_KEY_STORAGE = "strudel-ai-context-key";
-const CODE_STORAGE_PREFIX = "strudel-code-";
 
 // Get or create user-specific context key (persists across sessions)
 const getOrCreateContextKey = (): string => {
@@ -52,25 +67,6 @@ const getOrCreateContextKey = (): string => {
     localStorage.setItem(CONTEXT_KEY_STORAGE, contextKey);
   }
   return contextKey;
-};
-
-// Helper functions for code persistence
-const saveCodeForThread = (threadId: string, code: string) => {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(CODE_STORAGE_PREFIX + threadId, code);
-  } catch {
-    // Ignore storage errors
-  }
-};
-
-const loadCodeForThread = (threadId: string): string | null => {
-  if (typeof window === "undefined") return null;
-  try {
-    return localStorage.getItem(CODE_STORAGE_PREFIX + threadId);
-  } catch {
-    return null;
-  }
 };
 
 const strudelSuggestions: Suggestion[] = [
@@ -98,14 +94,11 @@ function AppContent() {
   const [threadInitialized, setThreadInitialized] = React.useState(false);
   const [contextKey] = React.useState(getOrCreateContextKey);
   const { isPending } = useLoadingState();
-  const { isReady: strudelIsReady, setCode, code } = useStrudel();
+  const { isReady: strudelIsReady, setThreadId } = useStrudel();
   const { thread, startNewThread, switchCurrentThread } = useTamboThread();
   const { data: threadList, isSuccess: threadListLoaded } = useTamboThreadList({
     contextKey,
   });
-
-  // Track previous thread to save code before switching
-  const prevThreadRef = React.useRef<string | null>(null);
 
   // Initialize: select most recent thread or create new
   React.useEffect(() => {
@@ -120,33 +113,14 @@ function AppContent() {
     setThreadInitialized(true);
   }, [strudelIsReady, threadListLoaded, threadInitialized, threadList, switchCurrentThread, startNewThread]);
 
-  // On thread change: save old code, load new code
+  // Sync thread ID to Strudel service (handles code persistence)
   React.useEffect(() => {
-    if (!thread || !strudelIsReady) return;
-
-    // Save code from previous thread
-    if (prevThreadRef.current && prevThreadRef.current !== thread.id && code) {
-      saveCodeForThread(prevThreadRef.current, code);
+    if (thread) {
+      setThreadId(thread.id);
     }
+  }, [thread, setThreadId]);
 
-    // Load code for new thread (only if switching to a different thread)
-    if (prevThreadRef.current !== thread.id) {
-      const savedCode = loadCodeForThread(thread.id);
-      if (savedCode) {
-        setCode(savedCode, false); // Load but don't play
-      }
-    }
-
-    prevThreadRef.current = thread.id;
-  }, [thread, strudelIsReady, code, setCode]);
-
-  // Auto-save current code on change
-  React.useEffect(() => {
-    if (!thread || !code) return;
-    saveCodeForThread(thread.id, code);
-  }, [thread, code]);
-
-  if (isPending || !strudelIsReady) {
+  if (isPending || !strudelIsReady || !thread) {
     return <LoadingScreen />;
   }
 
@@ -203,14 +177,23 @@ function AppContent() {
 }
 
 export default function Home() {
+  const apiKey = process.env.NEXT_PUBLIC_TAMBO_API_KEY;
+
+  if (!apiKey) {
+    return <ApiKeyMissing />;
+  }
+
   return (
     <LoadingContextProvider>
       <StrudelProvider>
         <TamboProvider
           tamboUrl={process.env.NEXT_PUBLIC_TAMBO_URL}
-          apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
+          apiKey={apiKey}
           tools={tools}
           components={components}
+          contextHelpers={{
+            strudelState: strudelContextHelper,
+          }}
         >
           <AppContent />
         </TamboProvider>

@@ -5,20 +5,34 @@ import { Play, Square, RotateCcw, BotIcon } from "lucide-react";
 import React from "react";
 
 export function StrudelStatusBar() {
-  const { isPlaying, isReady, play, stop, reset, error } = useStrudel();
+  const {
+    isPlaying,
+    isReady,
+    play,
+    stop,
+    reset,
+    error,
+    hasUnevaluatedChanges,
+  } = useStrudel();
   const { startNewThread, sendThreadMessage } = useTamboThread();
 
   const handleFixError = React.useCallback(() => {
     // Example fix: just clear errors and add a message to the thread
-    sendThreadMessage('Please fix the errors in my code.', { additionalContext: { error }});
+    sendThreadMessage("Please fix the errors in my code.", {
+      additionalContext: { error },
+    });
   }, [error, sendThreadMessage]);
 
   return (
     <>
       {error && (
         <div className="px-3 py-2 text-destructive border-t border-destructive/30">
-          <div className="w-full"><button className="" onClick={handleFixError}><BotIcon /> Fix Error</button></div>
-          <div>{error}</div>
+          <div className="w-full">
+            <button className="" onClick={handleFixError}>
+              <BotIcon /> Fix Error
+            </button>
+          </div>
+          <div>{typeof error === "string" ? error : error.message}</div>
         </div>
       )}
       <div className="px-3 py-1.5 border-t border-border text-muted-foreground flex items-center justify-between">
@@ -30,16 +44,15 @@ export function StrudelStatusBar() {
               "flex items-center gap-1.5 disabled:opacity-30",
               isPlaying
                 ? "text-primary"
-                : "text-muted-foreground hover:text-foreground"
+                : "text-muted-foreground hover:text-foreground",
             )}
           >
             {!isReady ? (
               <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
-            ) : (isPlaying ? (
-                <Square className="w-3 h-3" />
-              ) : (
-                <Play className="w-3 h-3" />
-              )
+            ) : isPlaying ? (
+              <Square className="w-3 h-3" />
+            ) : (
+              <Play className="w-3 h-3" />
             )}
             {isPlaying ? "stop" : "play"}
           </button>
@@ -47,6 +60,18 @@ export function StrudelStatusBar() {
           <span className={isPlaying ? "text-primary" : ""}>
             {isPlaying ? "playing" : "stopped"}
           </span>
+          {hasUnevaluatedChanges && (
+            <>
+              <span className="text-muted-foreground/50">|</span>
+              <button
+                onClick={play}
+                className="flex items-center gap-1.5 text-amber-500 hover:text-amber-400 animate-pulse"
+              >
+                <Play className="w-3 h-3" />
+                update
+              </button>
+            </>
+          )}
           <span className="text-muted-foreground/50">|</span>
           <button
             onClick={() => {
@@ -75,5 +100,5 @@ export function StrudelStatusBar() {
         </div>
       </div>
     </>
-  )
+  );
 }

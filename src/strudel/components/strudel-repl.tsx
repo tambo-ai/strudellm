@@ -12,5 +12,5 @@ export function StrudelRepl() {
     }
   }, [ref, setRoot]);
 
-  return <div ref={ref} className="h-full w-full flex flex-col justify-stretch items-stretch bg-gray-900 text-white *:h-full" />;
+  return <div ref={ref} className="h-full w-full flex flex-col justify-stretch items-stretch bg-background text-foreground *:h-full" />;
 }
