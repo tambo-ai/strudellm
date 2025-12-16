@@ -6,8 +6,15 @@ import { authClient } from "./auth-client";
 import { StrudelAccount } from "./jazz-schema";
 import { PropsWithChildren } from "react";
 
-const JAZZ_API_KEY =
-  process.env.NEXT_PUBLIC_JAZZ_API_KEY || "you@example.com";
+// In development, use email as key (Jazz allows this for testing)
+// In production, require a real Jazz API key from https://jazz.tools
+const JAZZ_API_KEY = process.env.NEXT_PUBLIC_JAZZ_API_KEY;
+
+if (!JAZZ_API_KEY) {
+  throw new Error(
+    "NEXT_PUBLIC_JAZZ_API_KEY is required. Get one at https://jazz.tools",
+  );
+}
 
 export function JazzAndAuthProvider({ children }: PropsWithChildren) {
   return (
