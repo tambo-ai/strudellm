@@ -11,8 +11,11 @@ const isProduction = process.env.NODE_ENV === "production";
 const databaseUrl = process.env.DATABASE_URL;
 const resendSegmentId = process.env.RESEND_SEGMENT;
 
-// Only initialize Resend in production
-const resend = isProduction ? new Resend(process.env.RESEND_API_KEY) : null;
+// Only initialize Resend in production when API key is available
+const resend =
+  isProduction && process.env.RESEND_API_KEY
+    ? new Resend(process.env.RESEND_API_KEY)
+    : null;
 
 async function addUserToResendSegment(email: string | null | undefined) {
   if (!email || !resend || !resendSegmentId) return;

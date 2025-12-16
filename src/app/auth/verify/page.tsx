@@ -48,7 +48,7 @@ function VerifyContent() {
           headers,
         },
       )
-      .then(({ data, error: fetchError }) => {
+      .then(({ error: fetchError }) => {
         if (fetchError) {
           setStatus("error");
           setError(fetchError.message || "Verification failed");
