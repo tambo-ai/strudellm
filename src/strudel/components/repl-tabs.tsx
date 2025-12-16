@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { useStrudel } from "@/strudel/context/strudel-provider";
 import { useStrudelStorage } from "@/hooks/use-strudel-storage";
 import { Plus, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState, useMemo, useRef } from "react";
 import { AuthModal } from "@/components/auth/auth-modal";
 import { useTamboThread } from "@tambo-ai/react";
 
@@ -14,26 +14,45 @@ import { useTamboThread } from "@tambo-ai/react";
  * - Anonymous users: shows single tab with sign-in prompt for "+"
  */
 export function ReplTabs() {
+  const { currentReplId, setReplId, createNewRepl, stop, isPlaying } =
+    useStrudel();
+  // Use reactive allRepls from storage hook - automatically updates when Jazz syncs
   const {
-    getCurrentReplId,
-    setReplId,
-    createNewRepl,
-    getAllRepls,
-    deleteRepl,
-    allRepls,
-    stop,
-    isPlaying,
-  } = useStrudel();
-  const { isAuthenticated } = useStrudelStorage();
-  const { startNewThread } = useTamboThread();
+    isAuthenticated,
+    allRepls: rawAllRepls,
+    getThreadForRepl,
+    archiveRepl,
+  } = useStrudelStorage();
+  const { startNewThread, switchCurrentThread } = useTamboThread();
   const [showAuthModal, setShowAuthModal] = useState(false);
 
-  const currentReplId = getCurrentReplId();
+  // Keep a stable reference to the initial order of REPLs
+  // This prevents reordering during render which can cause click events to hit wrong elements
+  const stableOrderRef = useRef<string[]>([]);
 
-  // Refresh the list of REPLs on mount and when auth changes
-  useEffect(() => {
-    getAllRepls();
-  }, [getAllRepls, isAuthenticated]);
+  // Memoize the sorted allRepls to maintain stable order during interactions
+  // Only update the order when the set of REPL IDs actually changes (new/deleted REPLs)
+  const allRepls = useMemo(() => {
+    const currentIds = new Set(rawAllRepls.map((r) => r.id));
+    const previousIds = new Set(stableOrderRef.current);
+
+    // Check if the set of IDs has changed (added or removed)
+    const idsChanged =
+      currentIds.size !== previousIds.size ||
+      [...currentIds].some((id) => !previousIds.has(id));
+
+    if (idsChanged || stableOrderRef.current.length === 0) {
+      // IDs changed, update the stable order
+      stableOrderRef.current = rawAllRepls.map((r) => r.id);
+      return rawAllRepls;
+    }
+
+    // IDs are the same, maintain the previous order
+    const replMap = new Map(rawAllRepls.map((r) => [r.id, r]));
+    return stableOrderRef.current
+      .map((id) => replMap.get(id))
+      .filter((r): r is NonNullable<typeof r> => r !== undefined);
+  }, [rawAllRepls]);
 
   const handleNewRepl = async () => {
     if (!isAuthenticated) {
@@ -41,31 +60,36 @@ export function ReplTabs() {
       return;
     }
     createNewRepl();
-    getAllRepls();
     // Start a new thread for the new REPL
     await startNewThread();
   };
 
-  const handleSwitchRepl = async (replId: string) => {
+  const handleSwitchRepl = async (replId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
     if (replId !== currentReplId) {
       // Stop playback before switching
       if (isPlaying) {
         stop();
       }
       setReplId(replId);
-      // Start a new thread when switching REPLs
-      // This ensures AI updates go to the correct REPL
-      await startNewThread();
+
+      // Switch to this REPL's thread if one exists
+      const threadId = getThreadForRepl(replId);
+      if (threadId) {
+        await switchCurrentThread(threadId);
+      }
+      // If no thread exists, do nothing - a new thread will be created on first message
     }
   };
 
-  const handleDeleteRepl = (replId: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent tab switch when clicking delete
+  const handleArchiveRepl = (replId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent tab switch when clicking close
 
-    // Don't allow deleting the last REPL
+    // Don't allow archiving the last REPL
     if (allRepls.length <= 1) return;
 
-    // If we're deleting the current REPL, switch to another one first
+    // If we're archiving the current REPL, switch to another one first
     if (replId === currentReplId) {
       const otherRepl = allRepls.find((r) => r.id !== replId);
       if (otherRepl) {
@@ -73,7 +97,7 @@ export function ReplTabs() {
       }
     }
 
-    deleteRepl(replId);
+    archiveRepl(replId);
   };
 
   // Get display name for a REPL tab
@@ -117,14 +141,14 @@ export function ReplTabs() {
               ? "text-foreground border-b-2 border-primary bg-background"
               : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
           )}
-          onClick={() => handleSwitchRepl(repl.id)}
+          onClick={(e) => handleSwitchRepl(repl.id, e)}
         >
           <span>{getTabName(repl, index)}</span>
           {canDelete && (
             <button
-              onClick={(e) => handleDeleteRepl(repl.id, e)}
+              onClick={(e) => handleArchiveRepl(repl.id, e)}
               className="ml-1 p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-muted-foreground/20 transition-opacity"
-              title="Delete REPL"
+              title="Close REPL"
             >
               <X className="w-3 h-3" />
             </button>

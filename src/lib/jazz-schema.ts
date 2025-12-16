@@ -15,6 +15,8 @@ export const StrudelRepl = co.map({
   createdAt: z.number(),
   /** When the REPL was last updated */
   lastUpdated: z.number(),
+  /** Whether this REPL is archived (hidden from tabs) */
+  archived: z.boolean().optional(),
 });
 
 export type StrudelRepl = co.loaded<typeof StrudelRepl>;

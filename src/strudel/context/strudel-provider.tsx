@@ -12,7 +12,7 @@ type StrudelContextValue = {
   setCode: (code: string, shouldPlay?: boolean) => void;
   setThreadId: (threadId: string | null) => void;
   setReplId: (replId: string) => void;
-  getCurrentReplId: () => string | null;
+  currentReplId: string | null;
   createNewRepl: (code?: string) => string | null;
   initializeRepl: () => string | null;
   isThreadOnDifferentRepl: (threadId: string) => boolean;
@@ -48,6 +48,9 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
   );
   const [isAiUpdating, setIsAiUpdating] = React.useState(false);
   const [allRepls, setAllRepls] = React.useState<ReplSummary[]>([]);
+  const [currentReplId, setCurrentReplId] = React.useState<string | null>(() =>
+    strudelService.getCurrentReplId(),
+  );
 
   React.useEffect(() => {
     const loadingUnsubscribe = strudelService.onLoadingProgress(
@@ -102,18 +105,23 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
 
   const setReplId = React.useCallback((replId: string) => {
     strudelService.setReplId(replId);
-  }, []);
-
-  const getCurrentReplId = React.useCallback(() => {
-    return strudelService.getCurrentReplId();
+    setCurrentReplId(replId);
   }, []);
 
   const createNewRepl = React.useCallback((code?: string) => {
-    return strudelService.createNewRepl(code);
+    const replId = strudelService.createNewRepl(code);
+    if (replId) {
+      setCurrentReplId(replId);
+    }
+    return replId;
   }, []);
 
   const initializeRepl = React.useCallback(() => {
-    return strudelService.initializeRepl();
+    const replId = strudelService.initializeRepl();
+    if (replId) {
+      setCurrentReplId(replId);
+    }
+    return replId;
   }, []);
 
   const isThreadOnDifferentRepl = React.useCallback((threadId: string) => {
@@ -155,7 +163,7 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
       setCode,
       setThreadId,
       setReplId,
-      getCurrentReplId,
+      currentReplId,
       createNewRepl,
       initializeRepl,
       isThreadOnDifferentRepl,
@@ -178,7 +186,7 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
     setCode,
     setThreadId,
     setReplId,
-    getCurrentReplId,
+    currentReplId,
     createNewRepl,
     initializeRepl,
     isThreadOnDifferentRepl,

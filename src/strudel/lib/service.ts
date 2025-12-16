@@ -32,7 +32,7 @@ import type {
 type LoadingCallback = (status: string, progress: number) => void;
 type CodeChangeCallback = (state: StrudelReplState) => void;
 
-const DEFAULT_CODE = `// Welcome to Strudel AI!
+const DEFAULT_CODE = `// Welcome to StrudelLM!
 // Write patterns here or ask the AI for help
 
 // Example: A simple drum pattern
@@ -309,27 +309,91 @@ export class StrudelService {
   /**
    * Initialize REPL state - called on app startup.
    * Loads the active REPL or creates a new one.
+   *
+   * Priority:
+   * 1. Use active REPL from localStorage if it exists in storage with real code
+   * 2. Use the most recently updated REPL from Jazz with real code
+   * 3. For anonymous users: create a new REPL
+   * 4. For authenticated users: wait for Jazz sync (return null, sync will handle it)
    */
   initializeRepl(): string | null {
-    if (!this.storageAdapter) return null;
+    if (!this.storageAdapter) {
+      console.log("[Service.initializeRepl] No storage adapter");
+      return null;
+    }
 
+    const isAuthenticated = this.storageAdapter.isAuthenticated;
     let replId = this.storageAdapter.getActiveReplId();
+    console.log(
+      "[Service.initializeRepl] Active REPL from localStorage:",
+      replId,
+      "isAuthenticated:",
+      isAuthenticated,
+    );
 
-    // If no active REPL, create one
-    if (!replId) {
-      replId = this.storageAdapter.createRepl(DEFAULT_CODE);
+    // Helper to check if code is real (not default)
+    const isRealCode = (code: string) => !code.includes("Welcome to StrudelLM");
+
+    // Check if the active REPL from localStorage actually exists with real code
+    if (replId) {
+      const repl = this.storageAdapter.getRepl(replId);
+      console.log(
+        "[Service.initializeRepl] REPL exists in storage:",
+        !!repl,
+        repl?.code?.substring(0, 50),
+      );
+      if (repl && isRealCode(repl.code)) {
+        // Found a valid REPL with real code
+        this.currentReplId = replId;
+        this.storageAdapter.setActiveReplId(replId);
+        if (this.editorInstance) {
+          this.setCode(repl.code);
+        }
+        return replId;
+      }
+      // REPL doesn't exist or only has default code
+      replId = null;
+    }
+
+    // If no valid active REPL, try to get one from storage with real code
+    const allRepls = this.storageAdapter.getAllRepls();
+    console.log(
+      "[Service.initializeRepl] All REPLs from storage:",
+      allRepls.length,
+    );
+
+    for (const replSummary of allRepls) {
+      const repl = this.storageAdapter.getRepl(replSummary.id);
+      if (repl && isRealCode(repl.code)) {
+        console.log(
+          "[Service.initializeRepl] Found REPL with real code:",
+          replSummary.id,
+          repl.code.substring(0, 50),
+        );
+        this.currentReplId = replSummary.id;
+        this.storageAdapter.setActiveReplId(replSummary.id);
+        if (this.editorInstance) {
+          this.setCode(repl.code);
+        }
+        return replSummary.id;
+      }
+    }
+
+    // No REPLs with real code found
+    // Use the first REPL if available (even with default code)
+    if (allRepls.length > 0) {
+      replId = allRepls[0].id;
+      console.log("[Service.initializeRepl] Using first REPL:", replId);
+      this.currentReplId = replId;
       this.storageAdapter.setActiveReplId(replId);
+      return replId;
     }
 
-    this.currentReplId = replId;
-
-    // Load the code
-    const code = this.loadReplCode(replId);
-    if (code && this.editorInstance) {
-      this.setCode(code);
-    }
-
-    return replId;
+    // No REPLs at all - StrudelStorageSync will handle creating one if needed
+    console.log(
+      "[Service.initializeRepl] No REPLs found, waiting for StrudelStorageSync",
+    );
+    return null;
   }
 
   // ============================================

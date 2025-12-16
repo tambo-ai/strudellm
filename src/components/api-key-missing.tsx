@@ -5,7 +5,7 @@ export function ApiKeyMissing() {
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-6 max-w-md px-8 text-center">
         <div>
-          <h1 className="text-2xl font-bold text-primary mb-1">Strudel AI</h1>
+          <h1 className="text-2xl font-bold text-primary mb-1">StrudelLM</h1>
           <p className="text-sm text-muted-foreground">
             Live coding with AI assistance
           </p>
@@ -19,8 +19,10 @@ export function ApiKeyMissing() {
             npx tambo init
           </code>
           <p className="text-xs text-muted-foreground mt-3">
-            Or add <code className="text-primary">NEXT_PUBLIC_TAMBO_API_KEY</code> to your{" "}
-            <code className="text-primary">.env.local</code> file, then refresh the page.
+            Or add{" "}
+            <code className="text-primary">NEXT_PUBLIC_TAMBO_API_KEY</code> to
+            your <code className="text-primary">.env.local</code> file, then
+            refresh the page.
           </p>
         </div>
 

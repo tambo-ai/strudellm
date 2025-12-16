@@ -3,14 +3,94 @@ import { magicLink } from "better-auth/plugins";
 import Database from "better-sqlite3";
 import { jazzPlugin } from "jazz-tools/better-auth/auth/server";
 import { Resend } from "resend";
+import { Pool } from "pg";
+import { PostgresDialect } from "kysely";
+import { getMigrations } from "better-auth/db";
 
 const isProduction = process.env.NODE_ENV === "production";
+const databaseUrl = process.env.DATABASE_URL;
+const resendSegmentId = process.env.RESEND_SEGMENT;
 
 // Only initialize Resend in production
 const resend = isProduction ? new Resend(process.env.RESEND_API_KEY) : null;
 
+async function addUserToResendSegment(email: string | null | undefined) {
+  if (!email || !resend || !resendSegmentId) return;
+
+  try {
+    // Ensure contact exists and is attached to the target segment
+    await resend.contacts.create({ email });
+    await resend.contacts.segments.add({
+      email,
+      segmentId: resendSegmentId,
+    });
+  } catch (error) {
+    console.error("Failed to add user to Resend segment", error);
+  }
+}
+
+let migrationsPromise: Promise<void> | null = null;
+let schemaPatchPromise: Promise<void> | null = null;
+
+async function ensureMigrations(dialect: PostgresDialect) {
+  if (migrationsPromise) return migrationsPromise;
+  const { runMigrations } = await getMigrations({
+    database: { dialect, type: "postgres" },
+  });
+  migrationsPromise = runMigrations();
+  return migrationsPromise;
+}
+
+async function ensureJazzColumns(pool: Pool) {
+  if (schemaPatchPromise) return schemaPatchPromise;
+  schemaPatchPromise = (async () => {
+    try {
+      await pool.query(
+        'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "accountID" text',
+      );
+      await pool.query(
+        'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "encryptedCredentials" text',
+      );
+    } catch (error) {
+      console.error("Failed to ensure Jazz columns on user table", error);
+    }
+  })();
+  return schemaPatchPromise;
+}
+
+function getDatabaseConfig() {
+  // Prefer Postgres when a DATABASE_URL is provided
+  if (databaseUrl && databaseUrl.startsWith("postgres")) {
+    const pool = new Pool({
+      connectionString: databaseUrl,
+      max: 5,
+    });
+    const dialect = new PostgresDialect({ pool });
+
+    // Run Better Auth migrations once (creates user/session tables)
+    void ensureMigrations(dialect).then(() => ensureJazzColumns(pool));
+
+    return {
+      dialect,
+      type: "postgres",
+    };
+  }
+
+  // Fallback to local SQLite for development (not persisted in prod)
+  return new Database("./auth.db");
+}
+
 export const auth = betterAuth({
-  database: new Database("./auth.db"),
+  database: getDatabaseConfig(),
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (createdUser) => {
+          await addUserToResendSegment(createdUser.email);
+        },
+      },
+    },
+  },
   plugins: [
     jazzPlugin(),
     magicLink({
@@ -48,7 +128,9 @@ export const auth = betterAuth({
             throw new Error("RESEND_API_KEY is required in production");
           }
           await resend.emails.send({
-            from: process.env.EMAIL_FROM || "Strudel LM <noreply@strudel.fm>",
+            from:
+              process.env.RESEND_EMAIL_FROM ||
+              "Strudel LM <noreply@strudellm.com>",
             to: email,
             subject: "Sign in to Strudel LM",
             html: emailHtml,

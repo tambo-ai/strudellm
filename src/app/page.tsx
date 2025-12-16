@@ -51,6 +51,10 @@ import {
 } from "@/strudel/context/strudel-provider";
 import { StrudelStatusBar } from "@/strudel/components/strudel-status-bar";
 import { StrudelService } from "@/strudel/lib/service";
+import { useStrudelStorage } from "@/hooks/use-strudel-storage";
+import { BetaModal } from "@/components/beta-modal";
+
+const BETA_MODAL_SHOWN_KEY = "strudel-beta-modal-shown-v1";
 
 /**
  * Context helper that provides the current Strudel REPL state to the AI.
@@ -126,25 +130,26 @@ const strudelSuggestions: Suggestion[] = [
 function AppContent() {
   const [threadInitialized, setThreadInitialized] = React.useState(false);
   const [replInitialized, setReplInitialized] = React.useState(false);
-  const [showReplSwitchWarning, setShowReplSwitchWarning] =
-    React.useState(false);
-  const [pendingThreadId, setPendingThreadId] = React.useState<string | null>(
-    null,
-  );
+  const [showBetaModal, setShowBetaModal] = React.useState(false);
   const contextKey = useContextKey();
   const { isPending } = useLoadingState();
+  const isAuthenticated = useIsAuthenticated();
   const {
     isReady: strudelIsReady,
-    isStorageLoaded,
     setThreadId,
+    currentReplId,
     setReplId,
-    getCurrentReplId,
     initializeRepl,
-    isThreadOnDifferentRepl,
-    getReplIdForThread,
     setIsAiUpdating,
-    stop,
   } = useStrudel();
+  // Use storage hook directly for reactive isLoaded and isAuthenticated state
+  const {
+    isLoaded: isStorageLoaded,
+    attachThreadToRepl,
+    getThreadReplId,
+    isReplArchived,
+    unarchiveRepl,
+  } = useStrudelStorage();
   const { thread, startNewThread, switchCurrentThread, isIdle } =
     useTamboThread();
   const { generationStage } = useTambo();
@@ -159,6 +164,14 @@ function AppContent() {
       !isIdle && generationStage !== "IDLE" && generationStage !== "COMPLETE";
     setIsAiUpdating(isGenerating);
   }, [isIdle, generationStage, setIsAiUpdating]);
+
+  // Show beta modal on first login
+  React.useEffect(() => {
+    if (isAuthenticated && !localStorage.getItem(BETA_MODAL_SHOWN_KEY)) {
+      setShowBetaModal(true);
+      localStorage.setItem(BETA_MODAL_SHOWN_KEY, "true");
+    }
+  }, [isAuthenticated]);
 
   // Initialize REPL on startup - wait for storage to be loaded (Jazz synced)
   React.useEffect(() => {
@@ -187,61 +200,37 @@ function AppContent() {
     startNewThread,
   ]);
 
-  // Sync thread ID to Strudel service and switch REPL if needed
+  // Sync thread ID to Strudel service
   React.useEffect(() => {
     if (thread) {
       setThreadId(thread.id);
+    }
+  }, [thread, setThreadId]);
 
-      // Check if this thread is associated with a different REPL
-      const threadReplId = getReplIdForThread(thread.id);
-      const activeReplId = getCurrentReplId();
-
-      if (threadReplId && threadReplId !== activeReplId) {
-        // Stop playback before switching REPLs (safe to call even if not playing)
-        stop();
-        // Switch to the REPL associated with this thread
-        setReplId(threadReplId);
+  // Attach thread to current REPL only if thread doesn't already have a REPL association
+  // This prevents overwriting existing associations when switching tabs
+  React.useEffect(() => {
+    if (thread && currentReplId) {
+      const existingReplId = getThreadReplId(thread.id);
+      if (!existingReplId) {
+        // Thread is new/unassociated - attach it to the current REPL
+        attachThreadToRepl(thread.id, currentReplId);
       }
     }
-    // Note: stop is intentionally not in deps to avoid dependency array size changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [thread, setThreadId, getReplIdForThread, getCurrentReplId, setReplId]);
+  }, [thread, currentReplId, getThreadReplId, attachThreadToRepl]);
 
-  // Handler for switching threads - checks if REPL switch is needed
-  // TODO: Integrate this with ThreadHistory component via onBeforeThreadSwitch prop
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _handleThreadSwitch = React.useCallback(
-    (threadId: string) => {
-      if (isThreadOnDifferentRepl(threadId)) {
-        // Thread is attached to a different REPL - show warning
-        setPendingThreadId(threadId);
-        setShowReplSwitchWarning(true);
-      } else {
-        // Same REPL or new thread - switch directly
-        switchCurrentThread(threadId);
-      }
-    },
-    [isThreadOnDifferentRepl, switchCurrentThread],
-  );
-
-  // Confirm REPL switch
-  const confirmReplSwitch = React.useCallback(() => {
-    if (pendingThreadId) {
-      const replId = getReplIdForThread(pendingThreadId);
-      if (replId) {
+  // Unarchive REPL when switching to a thread that's associated with an archived REPL
+  // This brings the REPL back into the tabs when opening its associated chat
+  React.useEffect(() => {
+    if (thread) {
+      const replId = getThreadReplId(thread.id);
+      if (replId && isReplArchived(replId)) {
+        unarchiveRepl(replId);
+        // Also switch to that REPL
         setReplId(replId);
       }
-      switchCurrentThread(pendingThreadId);
     }
-    setShowReplSwitchWarning(false);
-    setPendingThreadId(null);
-  }, [pendingThreadId, getReplIdForThread, setReplId, switchCurrentThread]);
-
-  // Cancel REPL switch
-  const cancelReplSwitch = React.useCallback(() => {
-    setShowReplSwitchWarning(false);
-    setPendingThreadId(null);
-  }, []);
+  }, [thread, getThreadReplId, isReplArchived, unarchiveRepl, setReplId]);
 
   if (isPending || !strudelIsReady || !thread) {
     return <LoadingScreen />;
@@ -249,38 +238,6 @@ function AppContent() {
 
   return (
     <Frame>
-      {/* REPL Switch Warning Dialog */}
-      {showReplSwitchWarning && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={cancelReplSwitch}
-          />
-          <div className="relative bg-background border border-border rounded-lg shadow-xl w-full max-w-md mx-4 p-6">
-            <h2 className="text-lg font-semibold mb-2">Switch REPL?</h2>
-            <p className="text-sm text-muted-foreground mb-4">
-              This conversation is connected to a different REPL. Switching will
-              load that REPL&apos;s code and replace your current editor
-              content.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={cancelReplSwitch}
-                className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-backdrop rounded-md transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmReplSwitch}
-                className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
-              >
-                Switch REPL
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <Sidebar>
         <Main>
           <StrudelRepl />
@@ -327,6 +284,9 @@ function AppContent() {
         <ThreadHistorySearch />
         <ThreadHistoryList />
       </ThreadHistory>
+
+      {/* Beta Modal */}
+      {showBetaModal && <BetaModal onClose={() => setShowBetaModal(false)} />}
     </Frame>
   );
 }
