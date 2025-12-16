@@ -1,7 +1,7 @@
 "use client";
 
 import { useAccount, useIsAuthenticated } from "jazz-tools/react";
-import { StrudelAccount } from "@/lib/jazz-schema";
+import { StrudelAccount, StrudelRepl } from "@/lib/jazz-schema";
 import { useCallback, useMemo } from "react";
 
 const STORAGE_PREFIX = "strudel-repl-";
@@ -14,6 +14,12 @@ const ACTIVE_REPL_KEY = "strudel-active-repl";
  * - One REPL can have many Threads
  * - Each Thread belongs to exactly one REPL
  */
+export interface ReplSummary {
+  id: string;
+  name?: string;
+  lastUpdated: number;
+}
+
 export interface StrudelStorageAdapter {
   /** Get the REPL for a given thread */
   getReplForThread: (
@@ -21,6 +27,8 @@ export interface StrudelStorageAdapter {
   ) => { replId: string; code: string } | null;
   /** Get a REPL by its ID */
   getRepl: (replId: string) => { code: string; name?: string } | null;
+  /** Get all REPLs (for tab display) */
+  getAllRepls: () => ReplSummary[];
   /** Save/update a REPL */
   saveRepl: (replId: string, code: string, name?: string) => void;
   /** Associate a thread with a REPL */
@@ -33,8 +41,12 @@ export interface StrudelStorageAdapter {
   setActiveReplId: (replId: string) => void;
   /** Create a new REPL and return its ID */
   createRepl: (code: string, name?: string) => string;
+  /** Delete a REPL by its ID */
+  deleteRepl: (replId: string) => void;
   /** Whether user is authenticated (using Jazz) */
   isAuthenticated: boolean;
+  /** Whether Jazz data has been loaded (for authenticated users) */
+  isLoaded: boolean;
 }
 
 /**
@@ -90,6 +102,56 @@ export function useStrudelStorage(): StrudelStorageAdapter {
     [account],
   );
 
+  const getAllRepls = useCallback((): ReplSummary[] => {
+    // If authenticated and Jazz root is available, use Jazz
+    if (account?.$isLoaded && account?.root?.repls) {
+      const repls = account.root.repls as unknown as Record<
+        string,
+        { id: string; name?: string; lastUpdated?: number } | undefined
+      >;
+      const result: ReplSummary[] = [];
+      for (const key of Object.keys(repls)) {
+        // Skip internal Jazz properties
+        if (key.startsWith("$") || key.startsWith("_")) continue;
+        const repl = repls[key];
+        if (repl && typeof repl === "object" && "code" in repl) {
+          result.push({
+            id: repl.id || key,
+            name: repl.name,
+            lastUpdated: repl.lastUpdated ?? 0,
+          });
+        }
+      }
+      // Sort by lastUpdated descending (most recent first)
+      return result.sort((a, b) => b.lastUpdated - a.lastUpdated);
+    }
+
+    // Otherwise use localStorage
+    if (typeof window === "undefined") return [];
+    try {
+      const result: ReplSummary[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(STORAGE_PREFIX)) {
+          const replId = key.slice(STORAGE_PREFIX.length);
+          const data = localStorage.getItem(key);
+          if (data) {
+            const parsed = JSON.parse(data);
+            result.push({
+              id: replId,
+              name: parsed.name,
+              lastUpdated: parsed.lastUpdated ?? 0,
+            });
+          }
+        }
+      }
+      // Sort by lastUpdated descending (most recent first)
+      return result.sort((a, b) => b.lastUpdated - a.lastUpdated);
+    } catch {
+      return [];
+    }
+  }, [account]);
+
   const getThreadReplId = useCallback(
     (threadId: string): string | null => {
       // If authenticated and Jazz root is available, use Jazz
@@ -138,15 +200,17 @@ export function useStrudelStorage(): StrudelStorageAdapter {
           const existing = repls[replId];
           const now = Date.now();
 
-          // Save the REPL using $jazz.set
-          // @ts-expect-error - Jazz $jazz.set API
-          account.root.repls.$jazz.set(replId, {
-            id: replId,
-            code,
-            name: name ?? existing?.name,
-            createdAt: existing?.createdAt ?? now,
-            lastUpdated: now,
-          });
+          // Save the REPL using $jazz.set with a proper StrudelRepl instance
+          account.root.repls.$jazz.set(
+            replId,
+            StrudelRepl.create({
+              id: replId,
+              code,
+              name: name ?? existing?.name,
+              createdAt: existing?.createdAt ?? now,
+              lastUpdated: now,
+            }),
+          );
         } catch (error) {
           console.error("Failed to save to Jazz:", error);
           // Fall back to localStorage
@@ -169,7 +233,6 @@ export function useStrudelStorage(): StrudelStorageAdapter {
       // If authenticated and Jazz root is available, save to Jazz
       if (account?.$isLoaded && account?.root?.threadToRepl) {
         try {
-          // @ts-expect-error - Jazz $jazz.set API
           account.root.threadToRepl.$jazz.set(threadId, replId);
         } catch (error) {
           console.error("Failed to save thread mapping to Jazz:", error);
@@ -204,7 +267,6 @@ export function useStrudelStorage(): StrudelStorageAdapter {
       // If authenticated and Jazz root is available, save to Jazz
       if (account?.$isLoaded && account?.root) {
         try {
-          // @ts-expect-error - Jazz $jazz.set API
           account.root.$jazz.set("activeReplId", replId);
         } catch (error) {
           console.error("Failed to save active REPL to Jazz:", error);
@@ -228,28 +290,56 @@ export function useStrudelStorage(): StrudelStorageAdapter {
     [saveRepl],
   );
 
+  const deleteRepl = useCallback(
+    (replId: string): void => {
+      // If authenticated and Jazz root is available, delete from Jazz
+      if (account?.$isLoaded && account?.root?.repls) {
+        try {
+          account.root.repls.$jazz.delete(replId);
+        } catch (error) {
+          console.error("Failed to delete REPL from Jazz:", error);
+          deleteFromLocalStorage(replId);
+        }
+        return;
+      }
+
+      // Otherwise use localStorage
+      deleteFromLocalStorage(replId);
+    },
+    [account],
+  );
+
+  // Jazz is loaded when we have the account root available
+  const isLoaded = !isAuthenticated || (account?.$isLoaded && !!account?.root);
+
   return useMemo(
     () => ({
       getReplForThread,
       getRepl,
+      getAllRepls,
       saveRepl,
       attachThreadToRepl,
       getThreadReplId,
       getActiveReplId,
       setActiveReplId,
       createRepl,
+      deleteRepl,
       isAuthenticated,
+      isLoaded,
     }),
     [
       getReplForThread,
       getRepl,
+      getAllRepls,
       saveRepl,
       attachThreadToRepl,
       getThreadReplId,
       getActiveReplId,
       setActiveReplId,
       createRepl,
+      deleteRepl,
       isAuthenticated,
+      isLoaded,
     ],
   );
 }
@@ -297,6 +387,15 @@ function saveActiveReplToLocalStorage(replId: string): void {
   }
 }
 
+function deleteFromLocalStorage(replId: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(STORAGE_PREFIX + replId);
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 /**
  * Creates a standalone storage adapter that can be used outside React.
  * This is a fallback for when the hook can't be used (e.g., in the service singleton).
@@ -330,6 +429,30 @@ export function createLocalStorageAdapter(): StrudelStorageAdapter {
       } catch {}
       return null;
     },
+    getAllRepls: () => {
+      if (typeof window === "undefined") return [];
+      try {
+        const result: ReplSummary[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith(STORAGE_PREFIX)) {
+            const replId = key.slice(STORAGE_PREFIX.length);
+            const data = localStorage.getItem(key);
+            if (data) {
+              const parsed = JSON.parse(data);
+              result.push({
+                id: replId,
+                name: parsed.name,
+                lastUpdated: parsed.lastUpdated ?? 0,
+              });
+            }
+          }
+        }
+        return result.sort((a, b) => b.lastUpdated - a.lastUpdated);
+      } catch {
+        return [];
+      }
+    },
     saveRepl: (replId: string, code: string, name?: string) => {
       saveToLocalStorage(replId, code, name);
     },
@@ -362,6 +485,10 @@ export function createLocalStorageAdapter(): StrudelStorageAdapter {
       saveToLocalStorage(replId, code, name);
       return replId;
     },
+    deleteRepl: (replId: string) => {
+      deleteFromLocalStorage(replId);
+    },
     isAuthenticated: false,
+    isLoaded: true, // localStorage is always "loaded"
   };
 }

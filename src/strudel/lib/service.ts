@@ -24,7 +24,10 @@ import {
   StrudelReplState,
 } from "@strudel/codemirror";
 import { getDrawContext, setTheme } from "@strudel/draw";
-import type { StrudelStorageAdapter } from "@/hooks/use-strudel-storage";
+import type {
+  StrudelStorageAdapter,
+  ReplSummary,
+} from "@/hooks/use-strudel-storage";
 
 type LoadingCallback = (status: string, progress: number) => void;
 type CodeChangeCallback = (state: StrudelReplState) => void;
@@ -154,6 +157,13 @@ export class StrudelService {
   }
 
   /**
+   * Check if storage is loaded (Jazz data synced)
+   */
+  get isStorageLoaded(): boolean {
+    return this.storageAdapter?.isLoaded ?? false;
+  }
+
+  /**
    * Get the current REPL ID
    */
   getCurrentReplId(): string | null {
@@ -177,6 +187,22 @@ export class StrudelService {
     if (!this.currentReplId) return false;
     const threadReplId = this.getReplIdForThread(threadId);
     return threadReplId !== null && threadReplId !== this.currentReplId;
+  }
+
+  /**
+   * Get all REPLs for tab display
+   */
+  getAllRepls(): ReplSummary[] {
+    if (!this.storageAdapter) return [];
+    return this.storageAdapter.getAllRepls();
+  }
+
+  /**
+   * Delete a REPL by its ID
+   */
+  deleteRepl(replId: string): void {
+    if (!this.storageAdapter) return;
+    this.storageAdapter.deleteRepl(replId);
   }
 
   /**

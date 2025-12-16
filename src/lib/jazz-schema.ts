@@ -57,11 +57,14 @@ export const StrudelAccount = co
   .withMigration(async (account) => {
     // Initialize root if it doesn't exist (new accounts)
     if (!account.root) {
-      account.root = StrudelAccountRoot.create({
-        repls: {},
-        threadToRepl: {},
-        activeReplId: undefined,
-      });
+      account.$jazz.set(
+        "root",
+        StrudelAccountRoot.create({
+          repls: {},
+          threadToRepl: {},
+          activeReplId: undefined,
+        }),
+      );
     }
   });
 

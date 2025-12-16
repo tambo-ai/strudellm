@@ -135,12 +135,15 @@ function AppContent() {
   const { isPending } = useLoadingState();
   const {
     isReady: strudelIsReady,
+    isStorageLoaded,
     setThreadId,
     setReplId,
+    getCurrentReplId,
     initializeRepl,
     isThreadOnDifferentRepl,
     getReplIdForThread,
     setIsAiUpdating,
+    stop,
   } = useStrudel();
   const { thread, startNewThread, switchCurrentThread, isIdle } =
     useTamboThread();
@@ -157,12 +160,12 @@ function AppContent() {
     setIsAiUpdating(isGenerating);
   }, [isIdle, generationStage, setIsAiUpdating]);
 
-  // Initialize REPL on startup
+  // Initialize REPL on startup - wait for storage to be loaded (Jazz synced)
   React.useEffect(() => {
-    if (!strudelIsReady || replInitialized) return;
+    if (!strudelIsReady || !isStorageLoaded || replInitialized) return;
     initializeRepl();
     setReplInitialized(true);
-  }, [strudelIsReady, replInitialized, initializeRepl]);
+  }, [strudelIsReady, isStorageLoaded, replInitialized, initializeRepl]);
 
   // Initialize: select most recent thread or create new
   React.useEffect(() => {
@@ -184,12 +187,25 @@ function AppContent() {
     startNewThread,
   ]);
 
-  // Sync thread ID to Strudel service (handles code persistence)
+  // Sync thread ID to Strudel service and switch REPL if needed
   React.useEffect(() => {
     if (thread) {
       setThreadId(thread.id);
+
+      // Check if this thread is associated with a different REPL
+      const threadReplId = getReplIdForThread(thread.id);
+      const activeReplId = getCurrentReplId();
+
+      if (threadReplId && threadReplId !== activeReplId) {
+        // Stop playback before switching REPLs (safe to call even if not playing)
+        stop();
+        // Switch to the REPL associated with this thread
+        setReplId(threadReplId);
+      }
     }
-  }, [thread, setThreadId]);
+    // Note: stop is intentionally not in deps to avoid dependency array size changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [thread, setThreadId, getReplIdForThread, getCurrentReplId, setReplId]);
 
   // Handler for switching threads - checks if REPL switch is needed
   // TODO: Integrate this with ThreadHistory component via onBeforeThreadSwitch prop
