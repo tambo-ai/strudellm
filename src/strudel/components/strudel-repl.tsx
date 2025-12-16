@@ -1,5 +1,6 @@
 import * as React from "react";
 import { useStrudel } from "../context/strudel-provider";
+import { ReplTabs } from "./repl-tabs";
 import { Loader2 } from "lucide-react";
 
 export function StrudelRepl() {
@@ -14,10 +15,11 @@ export function StrudelRepl() {
   }, [ref, setRoot]);
 
   return (
-    <div className="relative h-full w-full">
+    <div className="relative h-full w-full flex flex-col">
+      <ReplTabs />
       <div
         ref={ref}
-        className="h-full w-full flex flex-col justify-stretch items-stretch bg-background text-foreground *:h-full"
+        className="flex-1 min-h-0 flex flex-col justify-stretch items-stretch bg-background text-foreground *:h-full"
       />
 
       {/* Subtle AI updating indicator in corner */}

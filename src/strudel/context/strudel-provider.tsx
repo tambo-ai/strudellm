@@ -3,6 +3,7 @@
 import { useLoadingContext } from "@/components/loading/context";
 import { StrudelService } from "@/strudel/lib/service";
 import { StrudelReplState } from "@strudel/codemirror";
+import { ReplSummary } from "@/hooks/use-strudel-storage";
 import * as React from "react";
 
 type StrudelContextValue = {
@@ -16,6 +17,9 @@ type StrudelContextValue = {
   initializeRepl: () => string | null;
   isThreadOnDifferentRepl: (threadId: string) => boolean;
   getReplIdForThread: (threadId: string) => string | null;
+  allRepls: ReplSummary[];
+  getAllRepls: () => ReplSummary[];
+  deleteRepl: (replId: string) => void;
   isPlaying: boolean;
   hasUnevaluatedChanges: boolean;
   play: () => void;
@@ -24,6 +28,7 @@ type StrudelContextValue = {
   clearError: () => void;
   setRoot: (el: HTMLDivElement) => void;
   isReady: boolean;
+  isStorageLoaded: boolean;
   isAiUpdating: boolean;
   setIsAiUpdating: (value: boolean) => void;
 };
@@ -42,6 +47,7 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
     },
   );
   const [isAiUpdating, setIsAiUpdating] = React.useState(false);
+  const [allRepls, setAllRepls] = React.useState<ReplSummary[]>([]);
 
   React.useEffect(() => {
     const loadingUnsubscribe = strudelService.onLoadingProgress(
@@ -118,6 +124,19 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
     return strudelService.getReplIdForThread(threadId);
   }, []);
 
+  const getAllRepls = React.useCallback(() => {
+    const repls = strudelService.getAllRepls();
+    setAllRepls(repls);
+    return repls;
+  }, []);
+
+  const deleteRepl = React.useCallback((replId: string) => {
+    strudelService.deleteRepl(replId);
+    // Refresh the list after deletion
+    const repls = strudelService.getAllRepls();
+    setAllRepls(repls);
+  }, []);
+
   const providerValue: StrudelContextValue = React.useMemo(() => {
     const {
       started: isPlaying,
@@ -141,12 +160,16 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
       initializeRepl,
       isThreadOnDifferentRepl,
       getReplIdForThread,
+      allRepls,
+      getAllRepls,
+      deleteRepl,
       play: async () => await strudelService.play(),
       stop: strudelService.stop,
       reset: strudelService.reset,
       clearError: strudelService.clearError,
       setRoot,
       isReady: strudelService.isReady,
+      isStorageLoaded: strudelService.isStorageLoaded,
       isAiUpdating,
       setIsAiUpdating,
     };
@@ -160,6 +183,9 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
     initializeRepl,
     isThreadOnDifferentRepl,
     getReplIdForThread,
+    allRepls,
+    getAllRepls,
+    deleteRepl,
     replState,
     isAiUpdating,
   ]);
