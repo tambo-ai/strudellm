@@ -50,7 +50,12 @@ function generateReplId(): string {
  */
 export function useStrudelStorage(): StrudelStorageAdapter {
   const account = useAccount(StrudelAccount, {
-    resolve: { root: true },
+    resolve: {
+      root: {
+        repls: { $each: true },
+        threadToRepl: true,
+      },
+    },
   });
   const isAuthenticated = useIsAuthenticated();
 
