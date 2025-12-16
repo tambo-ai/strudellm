@@ -24,6 +24,7 @@ import {
   StrudelReplState,
 } from "@strudel/codemirror";
 import { getDrawContext, setTheme } from "@strudel/draw";
+import type { StrudelStorageAdapter } from "@/hooks/use-strudel-storage";
 
 type LoadingCallback = (status: string, progress: number) => void;
 type CodeChangeCallback = (state: StrudelReplState) => void;
@@ -56,10 +57,13 @@ export class StrudelService {
     started: false,
   } as StrudelReplState;
 
-  // Thread/persistence state
+  // Thread/REPL persistence state
   private currentThreadId: string | null = null;
+  private currentReplId: string | null = null;
   private isInitializing = false;
-  private static readonly STORAGE_PREFIX = "strudel-code-";
+
+  // Storage adapter (can be swapped for Jazz or localStorage)
+  private storageAdapter: StrudelStorageAdapter | null = null;
 
   private constructor() {}
 
@@ -138,52 +142,168 @@ export class StrudelService {
   }
 
   // ============================================
-  // Code Persistence
+  // Code Persistence (REPL/Thread Model)
   // ============================================
 
-  private getSavedCode(threadId: string): string | null {
-    if (typeof window === "undefined") return null;
-    try {
-      return localStorage.getItem(StrudelService.STORAGE_PREFIX + threadId);
-    } catch {
-      return null;
-    }
+  /**
+   * Set the storage adapter (Jazz or localStorage)
+   * Called from React components that have access to the useStrudelStorage hook
+   */
+  setStorageAdapter(adapter: StrudelStorageAdapter): void {
+    this.storageAdapter = adapter;
   }
 
+  /**
+   * Get the current REPL ID
+   */
+  getCurrentReplId(): string | null {
+    return this.currentReplId;
+  }
+
+  /**
+   * Get the REPL ID associated with a thread
+   */
+  getReplIdForThread(threadId: string): string | null {
+    if (this.storageAdapter) {
+      return this.storageAdapter.getThreadReplId(threadId);
+    }
+    return null;
+  }
+
+  /**
+   * Check if a thread is attached to a different REPL than the current one
+   */
+  isThreadOnDifferentRepl(threadId: string): boolean {
+    if (!this.currentReplId) return false;
+    const threadReplId = this.getReplIdForThread(threadId);
+    return threadReplId !== null && threadReplId !== this.currentReplId;
+  }
+
+  /**
+   * Save current code to the active REPL
+   */
   private saveCode(): void {
-    if (typeof window === "undefined" || !this.currentThreadId) return;
-    // Skip saving for placeholder threads (temporary IDs before server assigns real ID)
-    if (this.currentThreadId.includes("placeholder")) return;
-    try {
-      localStorage.setItem(
-        StrudelService.STORAGE_PREFIX + this.currentThreadId,
-        this._state.code,
-      );
-    } catch {
-      // Ignore storage errors
+    if (typeof window === "undefined" || !this.currentReplId) return;
+
+    // Use adapter if available
+    if (this.storageAdapter) {
+      this.storageAdapter.saveRepl(this.currentReplId, this._state.code);
+      return;
     }
   }
 
   /**
-   * Set the current thread ID and load its saved code
+   * Load code for a REPL
    */
-  setThreadId(threadId: string | null): void {
-    if (threadId === this.currentThreadId) return;
+  private loadReplCode(replId: string): string | null {
+    if (this.storageAdapter) {
+      const repl = this.storageAdapter.getRepl(replId);
+      return repl?.code ?? null;
+    }
+    return null;
+  }
 
-    // Save current thread's code before switching
-    if (this.currentThreadId) {
+  /**
+   * Set the current REPL and load its code
+   */
+  setReplId(replId: string): void {
+    if (replId === this.currentReplId) return;
+
+    // Save current REPL's code before switching
+    if (this.currentReplId) {
       this.saveCode();
     }
 
-    this.currentThreadId = threadId;
+    this.currentReplId = replId;
 
-    // Load code for new thread
-    if (threadId && this.editorInstance) {
-      const savedCode = this.getSavedCode(threadId);
+    // Update active REPL in storage
+    if (this.storageAdapter) {
+      this.storageAdapter.setActiveReplId(replId);
+    }
+
+    // Load code for the REPL
+    if (this.editorInstance) {
+      const savedCode = this.loadReplCode(replId);
       if (savedCode) {
         this.setCode(savedCode);
       }
     }
+  }
+
+  /**
+   * Set the current thread ID and ensure it's attached to the current REPL.
+   * If the thread is attached to a different REPL, this will NOT switch REPLs.
+   * Use setReplId() to switch REPLs explicitly.
+   */
+  setThreadId(threadId: string | null): void {
+    if (threadId === this.currentThreadId) return;
+
+    this.currentThreadId = threadId;
+
+    // Attach thread to current REPL if we have one
+    if (threadId && this.currentReplId && this.storageAdapter) {
+      // Only attach if thread doesn't already have a REPL
+      const existingReplId = this.storageAdapter.getThreadReplId(threadId);
+      if (!existingReplId) {
+        this.storageAdapter.attachThreadToRepl(threadId, this.currentReplId);
+      }
+    }
+  }
+
+  /**
+   * Create a new REPL with the given code (or default) and set it as active.
+   * Also attaches the current thread to the new REPL.
+   */
+  createNewRepl(code?: string): string | null {
+    if (!this.storageAdapter) return null;
+
+    // Save current REPL first
+    if (this.currentReplId) {
+      this.saveCode();
+    }
+
+    // Create new REPL
+    const replId = this.storageAdapter.createRepl(code ?? DEFAULT_CODE);
+    this.currentReplId = replId;
+    this.storageAdapter.setActiveReplId(replId);
+
+    // Load the code into the editor
+    if (this.editorInstance) {
+      this.setCode(code ?? DEFAULT_CODE);
+    }
+
+    // Attach current thread to new REPL
+    if (this.currentThreadId) {
+      this.storageAdapter.attachThreadToRepl(this.currentThreadId, replId);
+    }
+
+    return replId;
+  }
+
+  /**
+   * Initialize REPL state - called on app startup.
+   * Loads the active REPL or creates a new one.
+   */
+  initializeRepl(): string | null {
+    if (!this.storageAdapter) return null;
+
+    let replId = this.storageAdapter.getActiveReplId();
+
+    // If no active REPL, create one
+    if (!replId) {
+      replId = this.storageAdapter.createRepl(DEFAULT_CODE);
+      this.storageAdapter.setActiveReplId(replId);
+    }
+
+    this.currentReplId = replId;
+
+    // Load the code
+    const code = this.loadReplCode(replId);
+    if (code && this.editorInstance) {
+      this.setCode(code);
+    }
+
+    return replId;
   }
 
   // ============================================
@@ -408,9 +528,9 @@ export class StrudelService {
       // This is necessary because StrudelMirror doesn't sync initialCode to repl.state
       this.editorInstance.repl.setCode(currentCode);
 
-      // Load saved code for current thread if we don't already have code
-      if (this.currentThreadId && currentCode === DEFAULT_CODE) {
-        const savedCode = this.getSavedCode(this.currentThreadId);
+      // Load saved code for current REPL if we don't already have code
+      if (this.currentReplId && currentCode === DEFAULT_CODE) {
+        const savedCode = this.loadReplCode(this.currentReplId);
         if (savedCode) {
           this.setCode(savedCode);
         }

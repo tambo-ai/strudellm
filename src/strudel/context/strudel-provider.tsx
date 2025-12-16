@@ -10,6 +10,12 @@ type StrudelContextValue = {
   error: string | Error | null;
   setCode: (code: string, shouldPlay?: boolean) => void;
   setThreadId: (threadId: string | null) => void;
+  setReplId: (replId: string) => void;
+  getCurrentReplId: () => string | null;
+  createNewRepl: (code?: string) => string | null;
+  initializeRepl: () => string | null;
+  isThreadOnDifferentRepl: (threadId: string) => boolean;
+  getReplIdForThread: (threadId: string) => string | null;
   isPlaying: boolean;
   hasUnevaluatedChanges: boolean;
   play: () => void;
@@ -88,6 +94,30 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
     strudelService.setThreadId(threadId);
   }, []);
 
+  const setReplId = React.useCallback((replId: string) => {
+    strudelService.setReplId(replId);
+  }, []);
+
+  const getCurrentReplId = React.useCallback(() => {
+    return strudelService.getCurrentReplId();
+  }, []);
+
+  const createNewRepl = React.useCallback((code?: string) => {
+    return strudelService.createNewRepl(code);
+  }, []);
+
+  const initializeRepl = React.useCallback(() => {
+    return strudelService.initializeRepl();
+  }, []);
+
+  const isThreadOnDifferentRepl = React.useCallback((threadId: string) => {
+    return strudelService.isThreadOnDifferentRepl(threadId);
+  }, []);
+
+  const getReplIdForThread = React.useCallback((threadId: string) => {
+    return strudelService.getReplIdForThread(threadId);
+  }, []);
+
   const providerValue: StrudelContextValue = React.useMemo(() => {
     const {
       started: isPlaying,
@@ -105,6 +135,12 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
       hasUnevaluatedChanges,
       setCode,
       setThreadId,
+      setReplId,
+      getCurrentReplId,
+      createNewRepl,
+      initializeRepl,
+      isThreadOnDifferentRepl,
+      getReplIdForThread,
       play: async () => await strudelService.play(),
       stop: strudelService.stop,
       reset: strudelService.reset,
@@ -114,7 +150,19 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
       isAiUpdating,
       setIsAiUpdating,
     };
-  }, [setRoot, setCode, setThreadId, replState, isAiUpdating]);
+  }, [
+    setRoot,
+    setCode,
+    setThreadId,
+    setReplId,
+    getCurrentReplId,
+    createNewRepl,
+    initializeRepl,
+    isThreadOnDifferentRepl,
+    getReplIdForThread,
+    replState,
+    isAiUpdating,
+  ]);
 
   return (
     <StrudelContext.Provider value={providerValue}>
