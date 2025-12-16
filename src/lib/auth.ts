@@ -3,30 +3,11 @@ import { magicLink } from "better-auth/plugins";
 import Database from "better-sqlite3";
 import { jazzPlugin } from "jazz-tools/better-auth/auth/server";
 import { Resend } from "resend";
-import nodemailer from "nodemailer";
 
 const isProduction = process.env.NODE_ENV === "production";
 
 // Only initialize Resend in production
 const resend = isProduction ? new Resend(process.env.RESEND_API_KEY) : null;
-
-// Create Ethereal test account for development (no signup required)
-let devTransport: nodemailer.Transporter | null = null;
-async function getDevTransport() {
-  if (devTransport) return devTransport;
-
-  const testAccount = await nodemailer.createTestAccount();
-  devTransport = nodemailer.createTransport({
-    host: "smtp.ethereal.email",
-    port: 587,
-    secure: false,
-    auth: {
-      user: testAccount.user,
-      pass: testAccount.pass,
-    },
-  });
-  return devTransport;
-}
 
 export const auth = betterAuth({
   database: new Database("./auth.db"),
@@ -73,20 +54,8 @@ export const auth = betterAuth({
             html: emailHtml,
           });
         } else {
-          // Use Ethereal in development (no signup required)
-          const transport = await getDevTransport();
-          const info = await transport.sendMail({
-            from: "Strudel LM <noreply@strudel.fm>",
-            to: email,
-            subject: "Sign in to Strudel LM",
-            html: emailHtml,
-          });
-
-          // Log the preview URL where you can view the email
-          console.log(`\n🔗 Magic link for ${email}:\n${customUrl}`);
-          console.log(
-            `📧 Preview email: ${nodemailer.getTestMessageUrl(info)}\n`,
-          );
+          // In development, just log the magic link to console
+          console.log(`\n🔗 Magic link for ${email}:\n${customUrl}\n`);
         }
       },
     }),
