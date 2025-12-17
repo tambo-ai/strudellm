@@ -64,6 +64,8 @@ stack(
 
 const ALLOWED_KEYBINDINGS = ["codemirror", "vim", "emacs", "vscode"] as const;
 const MAX_EXPORT_CYCLES = 64;
+const MAX_EXPORT_SECONDS = 120;
+const MAX_EXPORT_FRAMES = 10_000_000;
 
 export class StrudelService {
   private static _instance: StrudelService | null = null;
@@ -165,7 +167,23 @@ export class StrudelService {
     sampleRate: number;
   }): Promise<AudioBuffer> {
     const seconds = cycles / cps;
+    if (!Number.isFinite(seconds) || seconds <= 0) {
+      throw new Error("Export failed: invalid duration");
+    }
+
     const numFrames = Math.ceil(seconds * sampleRate);
+
+    const maxFrames = Math.min(
+      MAX_EXPORT_FRAMES,
+      Math.ceil(MAX_EXPORT_SECONDS * sampleRate),
+    );
+    if (numFrames > maxFrames) {
+      const maxSeconds = Math.round(maxFrames / sampleRate);
+      throw new Error(
+        `Export too long (${Math.round(seconds)}s). Max is ${maxSeconds}s. Reduce cycles or increase CPS.`,
+      );
+    }
+
     const offlineContext = new OfflineAudioContext(2, numFrames, sampleRate);
 
     return await StrudelService.withDefaultAudioContext(
