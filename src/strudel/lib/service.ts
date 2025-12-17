@@ -70,6 +70,7 @@ export class StrudelService {
 
   // Audio engine state
   private isAudioInitialized = false;
+  private isExporting = false;
 
   // Editor state
   private editorInstance: StrudelMirror | null = null;
@@ -1102,6 +1103,9 @@ const keybindings = getKeybindings();
   // ============================================
 
   play = async (): Promise<void> => {
+    if (this.isExporting) {
+      return;
+    }
     this.registerGlobalErrorHandlers();
     this.installConsoleErrorFilter();
     try {
@@ -1144,6 +1148,12 @@ const keybindings = getKeybindings();
       throw new Error("Cycles must be a positive number");
     }
 
+    if (this.isExporting) {
+      throw new Error("Export already in progress");
+    }
+
+    this.isExporting = true;
+
     const code = this.getCode();
     const wasPlaying = this.isPlaying;
     if (wasPlaying) {
@@ -1175,6 +1185,7 @@ const keybindings = getKeybindings();
 
       return audioBufferToWavBlob(renderedBuffer);
     } finally {
+      this.isExporting = false;
       if (wasPlaying) {
         await this.play();
       }
