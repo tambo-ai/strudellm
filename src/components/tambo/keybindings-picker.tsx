@@ -44,7 +44,8 @@ export const KeybindingsPicker = React.forwardRef<
     string | null
   >(null);
 
-  // Initialize from localStorage or AI prop on mount
+  // Initialize the saved preference on mount and treat any AI prop as a
+  // pending selection the user can choose to save.
   React.useEffect(() => {
     if (initializedRef.current) return;
     initializedRef.current = true;
@@ -142,7 +143,7 @@ export const KeybindingsPicker = React.forwardRef<
         )}
       </div>
 
-      {/* Apply button */}
+      {/* Save button */}
       <div className="flex justify-end">
         <button
           onClick={handleSave}
@@ -156,7 +157,7 @@ export const KeybindingsPicker = React.forwardRef<
               : "bg-muted text-muted-foreground",
           )}
         >
-          Save
+          Save (refresh to apply)
         </button>
       </div>
 
