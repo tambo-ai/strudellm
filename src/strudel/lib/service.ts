@@ -64,6 +64,7 @@ export class StrudelService {
   private currentThreadId: string | null = null;
   private currentReplId: string | null = null;
   private isInitializing = false;
+  private isRestartingEditor = false;
 
   // Storage adapter (can be swapped for Jazz or localStorage)
   private storageAdapter: StrudelStorageAdapter | null = null;
@@ -469,9 +470,7 @@ export class StrudelService {
     }
   }
 
-  // ============================================
-  // Editor Runtime Restart (for keybindings)
-  // ============================================
+  // Editor runtime restart (for keybindings)
 
   /**
    * Restart the editor runtime.
@@ -480,41 +479,50 @@ export class StrudelService {
   async applyKeybindingsAndRestart(): Promise<void> {
     if (typeof window === "undefined") return;
 
+    const container = this.containerElement;
+    if (!container) return;
+    if (this.isRestartingEditor || this.isInitializing) return;
+
+    this.isRestartingEditor = true;
+
     // Get current state
     const wasPlaying = this.isPlaying;
     const currentCode = this.getCode();
-    const container = this.containerElement;
-
-    if (!container) return;
-
-    // Stop playback
-    if (wasPlaying) {
-      this.stop();
-    }
-
-    // Detach and reattach the editor
-    // Note: The keybindings need to be loaded dynamically
-    // For now, we'll store the preference and it will be applied on next page load
-    // A full implementation would require modifying the attach() method to accept keybindings
-
-    // Detach current editor
-    this.detach();
-
-    // Reattach with preserved code
     this._state = { ...this._state, code: currentCode };
+
+    let didAttach = false;
     try {
+      // Stop playback
+      if (wasPlaying) {
+        this.stop();
+      }
+
+      // Detach and reattach the editor
+      // Note: The keybindings need to be loaded dynamically
+      // For now, we'll store the preference and it will be applied on next page load
+      // A full implementation would require modifying the attach() method to accept keybindings
+
+      // Detach current editor
+      this.detach();
+
       await this.attach(container);
+      didAttach = true;
 
       // Restart playback if it was playing
       if (wasPlaying) {
         await this.play();
       }
     } catch (error) {
+      if (!didAttach) {
+        this.detach();
+      }
       console.error(
         "Failed to reattach editor after keybindings change:",
         error,
       );
       throw error;
+    } finally {
+      this.isRestartingEditor = false;
     }
   }
 
