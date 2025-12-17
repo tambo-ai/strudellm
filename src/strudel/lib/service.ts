@@ -68,7 +68,33 @@ export class StrudelService {
   // Storage adapter (can be swapped for Jazz or localStorage)
   private storageAdapter: StrudelStorageAdapter | null = null;
 
+  private visualizationWidgetsRegistered = false;
+
   private constructor() {}
+
+  private registerVisualizationWidgets(
+    registerWidget: (
+      type: string,
+      fn?: (id: string, options?: unknown, pat?: unknown) => unknown,
+    ) => void,
+  ): void {
+    if (this.visualizationWidgetsRegistered) return;
+
+    // Strudel's built-in codemirror widgets include `._scope()` (time-domain oscilloscope).
+    // This app also supports the alias `._waveform()` so the AI can use a more obvious name.
+    registerWidget(
+      "_waveform",
+      (id: string, options: unknown, pat?: unknown) => {
+        const maybePattern = pat as
+          | { _scope?: (id: string, options?: unknown) => unknown }
+          | undefined;
+        if (!maybePattern?._scope) return pat;
+        return maybePattern._scope(id, options);
+      },
+    );
+
+    this.visualizationWidgetsRegistered = true;
+  }
 
   /**
    * Get or create the singleton instance
@@ -562,7 +588,19 @@ export class StrudelService {
    * Attach the StrudelMirror editor to an HTML element
    */
   attach = async (container: HTMLElement): Promise<void> => {
-    const { StrudelMirror } = await import("@strudel/codemirror");
+    const codemirror = await import("@strudel/codemirror");
+    const StrudelMirror = codemirror.StrudelMirror;
+
+    const registerWidget = (codemirror as unknown as {
+      registerWidget?: (
+        type: string,
+        fn?: (id: string, options?: unknown, pat?: unknown) => unknown,
+      ) => void;
+    }).registerWidget;
+
+    if (registerWidget) {
+      this.registerVisualizationWidgets(registerWidget);
+    }
 
     // If already attached to this container, do nothing
     if (this.containerElement === container && this.editorInstance) {
