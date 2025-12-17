@@ -84,27 +84,6 @@ function stripVisualizationsFromCode(
   return { detectedVisualization, strippedCode: updatedLines.join("\n") };
 }
 
-function getLineIndexFromCursorLocation(
-  code: string,
-  cursorLocation: number | null,
-): number | null {
-  if (cursorLocation === null) return null;
-
-  const lines = code.split("\n");
-  let offset = 0;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? "";
-    const nextOffset = offset + line.length;
-    if (cursorLocation <= nextOffset) {
-      return i;
-    }
-    offset = nextOffset + 1;
-  }
-
-  return lines.length > 0 ? lines.length - 1 : null;
-}
-
 function findNearestNonEmptyLineIndex(
   lines: string[],
   preferredIndex: number,
@@ -116,20 +95,15 @@ function findNearestNonEmptyLineIndex(
     if (lines[i]?.trim()) return i;
   }
 
-  for (let i = preferredIndex + 1; i < lines.length; i++) {
-    if (lines[i]?.trim()) return i;
-  }
-
   return null;
 }
 
 function setVisualization(
   code: string,
   next: VisualizationOrOff,
-  cursorLocation: number | null,
+  cursorLineIndex: number | null,
 ): string {
-  const preferredLineIndex =
-    getLineIndexFromCursorLocation(code, cursorLocation) ?? 0;
+  const preferredLineIndex = cursorLineIndex ?? 0;
   const { strippedCode } = stripVisualizationsFromCode(code);
 
   if (!next) {
@@ -178,7 +152,7 @@ function setVisualization(
 export function VisualizationToggle({
   title = "Visualization",
 }: VisualizationToggleProps) {
-  const { code, setCode, isPlaying, getCursorLocation } = useStrudel();
+  const { code, setCode, isPlaying, getCursorLineIndex } = useStrudel();
 
   const detectedVisualization = React.useMemo(
     () => getDetectedVisualization(code),
@@ -211,7 +185,7 @@ export function VisualizationToggle({
         <button
           type="button"
           onClick={() => {
-            const updated = setVisualization(code, null, getCursorLocation());
+            const updated = setVisualization(code, null, getCursorLineIndex());
             setCode(updated, isPlaying);
             setSelectedVisualization(null);
           }}
@@ -237,7 +211,7 @@ export function VisualizationToggle({
                 const updated = setVisualization(
                   code,
                   next,
-                  getCursorLocation(),
+                  getCursorLineIndex(),
                 );
                 setCode(updated, isPlaying);
                 setSelectedVisualization(next);

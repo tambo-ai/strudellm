@@ -498,6 +498,33 @@ export class StrudelService {
     return getCursorLocation.call(this.editorInstance);
   }
 
+  getCursorLineIndex(): number | null {
+    if (!this.editorInstance) return null;
+
+    const editorInstance = this.editorInstance as unknown as {
+      getCursorLocation?: () => number;
+      editor?: {
+        state?: {
+          doc?: {
+            lineAt?: (pos: number) => { number: number };
+          };
+        };
+      };
+    };
+
+    if (typeof editorInstance.getCursorLocation !== "function") return null;
+    const cursorLocation = editorInstance.getCursorLocation.call(
+      this.editorInstance,
+    );
+
+    const lineAt = editorInstance.editor?.state?.doc?.lineAt;
+    if (typeof lineAt !== "function") return null;
+
+    const line = lineAt(cursorLocation);
+    const lineIndex = line.number - 1;
+    return Number.isFinite(lineIndex) ? lineIndex : null;
+  }
+
   /**
    * Set code in the editor
    */

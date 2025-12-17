@@ -10,7 +10,7 @@ type StrudelContextValue = {
   code: string;
   error: string | Error | null;
   setCode: (code: string, shouldPlay?: boolean) => void;
-  getCursorLocation: () => number | null;
+  getCursorLineIndex: () => number | null;
   setThreadId: (threadId: string | null) => void;
   setReplId: (replId: string) => void;
   currentReplId: string | null;
@@ -100,8 +100,8 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
-  const getCursorLocation = React.useCallback(() => {
-    return strudelService.getCursorLocation();
+  const getCursorLineIndex = React.useCallback(() => {
+    return strudelService.getCursorLineIndex();
   }, []);
 
   const setThreadId = React.useCallback((threadId: string | null) => {
@@ -166,7 +166,7 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
       isPlaying,
       hasUnevaluatedChanges,
       setCode,
-      getCursorLocation,
+      getCursorLineIndex,
       setThreadId,
       setReplId,
       currentReplId,
@@ -190,7 +190,7 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
   }, [
     setRoot,
     setCode,
-    getCursorLocation,
+    getCursorLineIndex,
     setThreadId,
     setReplId,
     currentReplId,
