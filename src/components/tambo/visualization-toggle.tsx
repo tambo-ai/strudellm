@@ -19,6 +19,8 @@ type VisualizationType = "pianoroll" | "waveform" | "spectrum";
 
 type VisualizationOrOff = VisualizationType | null;
 
+// Maximum distance (in lines) to search above/below the cursor when deciding
+// where to detect/apply a visualization.
 const DEFAULT_NEAREST_NON_EMPTY_LINE_DISTANCE = 32;
 
 const VISUALIZATION_OPTIONS: Array<{
@@ -76,12 +78,10 @@ function getDetectedVisualization(
     );
 
     const idx = findNearestNonEmptyLineIndex(lines, preferredIndex);
-    const { type } = stripTrailingVisualizationFromLine(
-      idx === null ? "" : (lines[idx] ?? ""),
-    );
-    if (type) return type;
-
-    return null;
+    if (idx !== null) {
+      const { type } = stripTrailingVisualizationFromLine(lines[idx] ?? "");
+      if (type) return type;
+    }
   }
 
   for (let i = lines.length - 1; i >= 0; i--) {
@@ -170,9 +170,11 @@ export function VisualizationToggle({
 }: VisualizationToggleProps) {
   const { code, setCode, isPlaying, getCursorLineIndex } = useStrudel();
 
+  const cursorLineIndex = getCursorLineIndex();
+
   const detectedVisualization = React.useMemo(
-    () => getDetectedVisualization(code, getCursorLineIndex()),
-    [code, getCursorLineIndex],
+    () => getDetectedVisualization(code, cursorLineIndex),
+    [code, cursorLineIndex],
   );
 
   const [selectedVisualization, setSelectedVisualization] =
@@ -202,7 +204,9 @@ export function VisualizationToggle({
           type="button"
           onClick={() => {
             const updated = setVisualization(code, null, getCursorLineIndex());
-            setCode(updated, isPlaying);
+            if (updated !== code) {
+              setCode(updated, isPlaying);
+            }
             setSelectedVisualization(null);
           }}
           className={cn(
@@ -229,8 +233,10 @@ export function VisualizationToggle({
                   next,
                   getCursorLineIndex(),
                 );
-                setCode(updated, isPlaying);
-                setSelectedVisualization(next);
+                if (updated !== code) {
+                  setCode(updated, isPlaying);
+                  setSelectedVisualization(next);
+                }
               }}
               className={cn(
                 "px-3 py-1.5 rounded-md text-sm border transition-all",

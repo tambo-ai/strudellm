@@ -506,7 +506,7 @@ export class StrudelService {
         .getCursorLocation;
 
     if (typeof getCursorLocation !== "function") return null;
-    return getCursorLocation.call(this.editorInstance);
+    return getCursorLocation();
   }
 
   getCursorLineIndex(): number | null {
@@ -523,6 +523,7 @@ export class StrudelService {
     if (typeof lineAt !== "function") return null;
 
     const line = lineAt(cursorLocation);
+    if (!line || typeof line.number !== "number" || line.number < 1) return null;
     const lineIndex = line.number - 1;
     return Number.isFinite(lineIndex) ? lineIndex : null;
   }
