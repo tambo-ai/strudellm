@@ -21,7 +21,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const parsed = createShareSchema.safeParse(await req.json());
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const parsed = createShareSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Invalid request", issues: parsed.error.issues },
