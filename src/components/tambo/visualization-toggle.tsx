@@ -38,21 +38,29 @@ const VISUALIZATION_OPTIONS: Array<{
 function stripTrailingVisualizationFromLine(
   line: string,
 ): { type: VisualizationOrOff; strippedLine: string } {
-  for (const candidate of VISUALIZATION_OPTIONS) {
-    const callVariants = [candidate.methodCall, ...(candidate.aliases ?? [])];
-    for (const call of callVariants) {
-      const escapedCall = call.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const re = new RegExp(`${escapedCall}\\s*;?\\s*$`);
-      if (re.test(line)) {
-        return {
-          type: candidate.id,
-          strippedLine: line.replace(re, "").trimEnd(),
-        };
+  let currentLine = line;
+  let lastType: VisualizationOrOff = null;
+
+  while (true) {
+    let changed = false;
+
+    for (const candidate of VISUALIZATION_OPTIONS) {
+      const callVariants = [candidate.methodCall, ...(candidate.aliases ?? [])];
+      for (const call of callVariants) {
+        const escapedCall = call.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const re = new RegExp(`${escapedCall}\\s*;?\\s*$`);
+        if (re.test(currentLine)) {
+          lastType = candidate.id;
+          currentLine = currentLine.replace(re, "").trimEnd();
+          changed = true;
+        }
       }
     }
+
+    if (!changed) break;
   }
 
-  return { type: null, strippedLine: line };
+  return { type: lastType, strippedLine: currentLine };
 }
 
 function getTrailingVisualization(code: string): VisualizationOrOff {

@@ -81,7 +81,8 @@ export class StrudelService {
     if (this.visualizationWidgetsRegistered) return;
 
     // Strudel's built-in codemirror widgets include `._scope()` (time-domain oscilloscope).
-    // This app also supports the alias `._waveform()` so the AI can use a more obvious name.
+    // Strudel already exposes widgets like `._pianoroll()` and `._spectrum()`.
+    // This app additionally supports the alias `._waveform()` so the AI can use a more obvious name.
     registerWidget(
       "_waveform",
       (id: string, options: unknown, pat?: unknown) => {
