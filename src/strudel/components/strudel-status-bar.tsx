@@ -84,24 +84,11 @@ export function StrudelStatusBar() {
     );
     const existing = attachments.find((a) => a.name === "Strudel Error");
 
-    if (existing && existing.metadata?.attachmentKey !== attachmentKey) {
-      removeContextAttachment(existing.id);
-      setTimeout(() => {
-        addContextAttachment({
-          name: "Strudel Error",
-          icon: <AlertCircle className="w-3 h-3" />,
-          metadata: {
-            attachmentKey,
-            errorType,
-            errorMessage,
-            missingSample,
-            code,
-          },
-        });
-      }, 0);
-    }
+    if (!existing || existing.metadata?.attachmentKey !== attachmentKey) {
+      if (existing) {
+        removeContextAttachment(existing.id);
+      }
 
-    if (!existing) {
       addContextAttachment({
         name: "Strudel Error",
         icon: <AlertCircle className="w-3 h-3" />,
