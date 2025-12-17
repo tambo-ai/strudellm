@@ -53,6 +53,7 @@ import { StrudelStatusBar } from "@/strudel/components/strudel-status-bar";
 import { StrudelService } from "@/strudel/lib/service";
 import { useStrudelStorage } from "@/hooks/use-strudel-storage";
 import { BetaModal } from "@/components/beta-modal";
+import { useSession } from "@/lib/auth-client";
 
 const BETA_MODAL_SHOWN_KEY = "strudel-beta-modal-shown-v1";
 
@@ -87,21 +88,11 @@ const getOrCreateAnonymousContextKey = (): string => {
 
 // Hook to get context key (user ID if logged in, anonymous otherwise)
 function useContextKey(): string {
-  const { isAuthenticated, isLoaded } = useStrudelStorage();
+  const { data: session } = useSession();
   const [anonymousKey] = React.useState(getOrCreateAnonymousContextKey);
 
-  // If user is logged in, use a persistent key stored in localStorage
-  // This ensures the same user gets the same context key across sessions
-  if (isAuthenticated && isLoaded) {
-    // For authenticated users, we use a separate persistent key
-    // that gets created once and stored (similar to anonymous key)
-    const AUTH_CONTEXT_KEY_STORAGE = "strudel-ai-auth-context-key";
-    let authKey = localStorage.getItem(AUTH_CONTEXT_KEY_STORAGE);
-    if (!authKey) {
-      authKey = `strudel-user-${crypto.randomUUID()}`;
-      localStorage.setItem(AUTH_CONTEXT_KEY_STORAGE, authKey);
-    }
-    return authKey;
+  if (session?.user?.id) {
+    return `strudel-user-${session.user.id}`;
   }
 
   // Otherwise use anonymous key
@@ -134,6 +125,7 @@ function AppContent() {
   const [replInitialized, setReplInitialized] = React.useState(false);
   const [showBetaModal, setShowBetaModal] = React.useState(false);
   const contextKey = useContextKey();
+  const prevContextKeyRef = React.useRef<string | null>(null);
   const { isPending } = useLoadingState();
   const isAuthenticated = useIsAuthenticated();
   const {
@@ -158,6 +150,17 @@ function AppContent() {
   const { data: threadList, isSuccess: threadListLoaded } = useTamboThreadList({
     contextKey,
   });
+
+  // If the context key changes (e.g. user signs in/out), re-initialize thread selection
+  React.useEffect(() => {
+    if (
+      prevContextKeyRef.current !== null &&
+      prevContextKeyRef.current !== contextKey
+    ) {
+      setThreadInitialized(false);
+    }
+    prevContextKeyRef.current = contextKey;
+  }, [contextKey]);
 
   // Track AI generation state to lock editor during updates
   React.useEffect(() => {

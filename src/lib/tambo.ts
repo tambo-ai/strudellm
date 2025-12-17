@@ -16,7 +16,12 @@
 import type { TamboComponent, TamboTool } from "@tambo-ai/react";
 import { validateAndUpdateRepl } from "@/strudel/tools/validateAndUpdateRepl";
 import { listSamples } from "@/strudel/tools/listSamples";
-import { MultiSelectForm, multiSelectFormSchema } from "@/components/tambo/multi-select-form";
+import {
+  MultiSelectForm,
+  multiSelectFormSchema,
+} from "@/components/tambo/multi-select-form";
+import { SaveSong, saveSongSchema } from "@/components/tambo/save-song";
+import { ShareSong, shareSongSchema } from "@/components/tambo/share-song";
 
 /**
  * tools
@@ -31,6 +36,20 @@ export const tools: TamboTool[] = [validateAndUpdateRepl, listSamples];
  * Tambo components that can be rendered by the AI.
  */
 export const components: TamboComponent[] = [
+  {
+    name: "SaveSong",
+    description:
+      "Save and manage Strudel songs. Requires the user to be signed in. Use when the user says things like: 'save this song', 'name this song', 'show my saved songs', 'load my saved song'.",
+    component: SaveSong,
+    propsSchema: saveSongSchema,
+  },
+  {
+    name: "ShareSong",
+    description:
+      "Generate a public share link for the current Strudel song. Requires the user to be signed in. Use when the user says things like: 'share this', 'give me a link to this song', 'share this with a link'.",
+    component: ShareSong,
+    propsSchema: shareSongSchema,
+  },
   {
     name: "MultiSelectForm",
     description:
