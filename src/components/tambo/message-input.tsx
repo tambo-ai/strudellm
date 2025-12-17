@@ -132,8 +132,7 @@ const useMessageInputContext = () => {
  * Props for the MessageInput component.
  * Extends standard HTMLFormElement attributes.
  */
-export interface MessageInputProps
-  extends React.HTMLAttributes<HTMLFormElement> {
+export interface MessageInputProps extends React.HTMLAttributes<HTMLFormElement> {
   /** The context key identifying which thread to send messages to. */
   contextKey?: string;
   /** Optional styling variant for the input container. */
@@ -236,10 +235,15 @@ const MessageInputInternal = React.forwardRef<
       } catch (error) {
         console.error("Failed to submit message:", error);
         setDisplayValue(value);
+
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        const isThreadError = errorMessage.toLowerCase().includes("thread");
+
         setSubmitError(
-          error instanceof Error
-            ? error.message
-            : "Failed to send message. Please try again.",
+          isThreadError
+            ? "Thread error. Please try again or start a new thread."
+            : errorMessage || "Failed to send message. Please try again.",
         );
 
         // Cancel the thread to reset loading state
@@ -423,8 +427,7 @@ declare global {
  * Props for the MessageInputTextarea component.
  * Extends standard TextareaHTMLAttributes.
  */
-export interface MessageInputTextareaProps
-  extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+export interface MessageInputTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   /** Custom placeholder text. */
   placeholder?: string;
 }
@@ -505,8 +508,8 @@ const MessageInputTextarea = ({
         "flex-1 p-3 rounded-t-lg bg-background text-foreground resize-none text-sm min-h-[82px] max-h-[40vh] focus:outline-none placeholder:text-muted-foreground/50",
         className,
       )}
-      disabled={isPending || isUpdatingToken}
-      placeholder={placeholder}
+      disabled={isUpdatingToken}
+      placeholder={isPending ? "Prepare your next message..." : placeholder}
       aria-label="Chat Message Input"
       data-slot="message-input-textarea"
       {...props}
@@ -519,8 +522,7 @@ MessageInputTextarea.displayName = "MessageInput.Textarea";
  * Props for the MessageInputSubmitButton component.
  * Extends standard ButtonHTMLAttributes.
  */
-export interface MessageInputSubmitButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+export interface MessageInputSubmitButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   /** Optional content to display inside the button. */
   children?: React.ReactNode;
 }
@@ -543,7 +545,7 @@ const MessageInputSubmitButton = React.forwardRef<
   HTMLButtonElement,
   MessageInputSubmitButtonProps
 >(({ className, children, ...props }, ref) => {
-  const { isPending } = useMessageInputContext();
+  const { isPending, value } = useMessageInputContext();
   const { cancel } = useTamboThread();
   const isUpdatingToken = useIsTamboTokenUpdating();
 
@@ -558,7 +560,18 @@ const MessageInputSubmitButton = React.forwardRef<
     className,
   );
 
-  return (
+  // Show different tooltip based on state
+  const getTooltipContent = () => {
+    if (isPending) {
+      return "Click to cancel generation";
+    }
+    if (value.trim()) {
+      return "Send message";
+    }
+    return "Type a message to send";
+  };
+
+  const button = (
     <button
       ref={ref}
       type={isPending ? "button" : "submit"}
@@ -577,6 +590,12 @@ const MessageInputSubmitButton = React.forwardRef<
         ))}
     </button>
   );
+
+  return (
+    <Tooltip content={getTooltipContent()} side="top">
+      {button}
+    </Tooltip>
+  );
 });
 MessageInputSubmitButton.displayName = "MessageInput.SubmitButton";
 
@@ -584,8 +603,7 @@ MessageInputSubmitButton.displayName = "MessageInput.SubmitButton";
  * Props for the MessageInputNewThreadButton component.
  * Extends standard ButtonHTMLAttributes.
  */
-export interface MessageInputNewThreadButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+export interface MessageInputNewThreadButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   /** Optional content to display inside the button. */
   children?: React.ReactNode;
   /** Callback when a new thread is created */
@@ -768,8 +786,7 @@ MessageInputError.displayName = "MessageInput.Error";
 /**
  * Props for the MessageInputFileButton component.
  */
-export interface MessageInputFileButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+export interface MessageInputFileButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   /** Accept attribute for file input - defaults to image types */
   accept?: string;
   /** Allow multiple file selection */

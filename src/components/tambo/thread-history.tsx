@@ -17,6 +17,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import React, { useMemo } from "react";
+import { ThreadSwitchDialog } from "./thread-switch-dialog";
 
 /**
  * Context for sharing thread history state and functions
@@ -382,11 +383,19 @@ const ThreadHistoryList = React.forwardRef<
     refetch,
   } = useThreadHistoryContext();
 
+  const { isIdle, cancel } = useTamboThread();
+
   const [editingThread, setEditingThread] = React.useState<TamboThread | null>(
     null,
   );
   const [newName, setNewName] = React.useState("");
   const inputRef = React.useRef<HTMLInputElement>(null);
+
+  // State for thread switch confirmation dialog
+  const [showSwitchDialog, setShowSwitchDialog] = React.useState(false);
+  const [pendingThreadId, setPendingThreadId] = React.useState<string | null>(
+    null,
+  );
 
   // Handle click outside name editing input
   React.useEffect(() => {
@@ -441,12 +450,41 @@ const ThreadHistoryList = React.forwardRef<
   const handleSwitchThread = async (threadId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
 
+    // If currently generating, show confirmation dialog
+    if (!isIdle) {
+      setPendingThreadId(threadId);
+      setShowSwitchDialog(true);
+      return;
+    }
+
     try {
       switchCurrentThread(threadId);
       onThreadChange?.();
     } catch (error) {
       console.error("Failed to switch thread:", error);
     }
+  };
+
+  const handleConfirmSwitch = async () => {
+    if (!pendingThreadId) return;
+
+    try {
+      // Cancel the current generation
+      await cancel();
+      // Then switch threads
+      switchCurrentThread(pendingThreadId);
+      onThreadChange?.();
+    } catch (error) {
+      console.error("Failed to switch thread:", error);
+    } finally {
+      setShowSwitchDialog(false);
+      setPendingThreadId(null);
+    }
+  };
+
+  const handleCancelSwitch = () => {
+    setShowSwitchDialog(false);
+    setPendingThreadId(null);
   };
 
   const handleRename = (thread: TamboThread) => {
@@ -580,19 +618,28 @@ const ThreadHistoryList = React.forwardRef<
   }
 
   return (
-    <div
-      ref={ref}
-      className={cn(
-        "overflow-y-auto flex-1 transition-all duration-300 ease-in-out",
-        isCollapsed
-          ? "opacity-0 max-h-0 overflow-hidden pointer-events-none"
-          : "opacity-100 max-h-full pointer-events-auto",
-        className,
-      )}
-      {...props}
-    >
-      {content}
-    </div>
+    <>
+      <div
+        ref={ref}
+        className={cn(
+          "overflow-y-auto flex-1 transition-all duration-300 ease-in-out",
+          isCollapsed
+            ? "opacity-0 max-h-0 overflow-hidden pointer-events-none"
+            : "opacity-100 max-h-full pointer-events-auto",
+          className,
+        )}
+        {...props}
+      >
+        {content}
+      </div>
+
+      <ThreadSwitchDialog
+        open={showSwitchDialog}
+        onOpenChange={setShowSwitchDialog}
+        onConfirm={handleConfirmSwitch}
+        onCancel={handleCancelSwitch}
+      />
+    </>
   );
 });
 ThreadHistoryList.displayName = "ThreadHistory.List";

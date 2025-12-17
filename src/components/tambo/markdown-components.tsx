@@ -109,7 +109,7 @@ export const createMarkdownComponents = (): Record<
 
     if (match && looksLikeCode(content)) {
       return (
-        <div className="relative border border-border rounded-md bg-muted max-w-[80ch] text-sm my-4">
+        <div className="relative border border-border rounded-md bg-muted w-full max-w-full text-sm my-4 overflow-hidden">
           <CodeHeader language={match[1]} code={content} />
           <div
             className={cn(

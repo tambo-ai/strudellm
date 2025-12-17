@@ -1,8 +1,32 @@
 import { cn } from "@/lib/utils";
 import { useStrudel } from "@/strudel/context/strudel-provider";
-import { useTamboThread } from "@tambo-ai/react";
+import { StrudelService } from "@/strudel/lib/service";
+import { useTamboThread, useTamboThreadInput } from "@tambo-ai/react";
 import { Play, Square, RotateCcw, BotIcon } from "lucide-react";
 import React from "react";
+
+/**
+ * Categorize the error type for better context
+ */
+function categorizeError(error: string | Error): string {
+  const errorMsg = typeof error === "string" ? error : error.message;
+  const lowerMsg = errorMsg.toLowerCase();
+
+  if (lowerMsg.includes("sample") || lowerMsg.includes("sound not found")) {
+    return "invalid_sample";
+  }
+  if (lowerMsg.includes("undefined") || lowerMsg.includes("not a pattern")) {
+    return "invalid_pattern";
+  }
+  if (
+    lowerMsg.includes("syntax") ||
+    lowerMsg.includes("unexpected") ||
+    lowerMsg.includes("parse")
+  ) {
+    return "syntax_error";
+  }
+  return "runtime_error";
+}
 
 export function StrudelStatusBar() {
   const {
@@ -12,16 +36,64 @@ export function StrudelStatusBar() {
     stop,
     reset,
     error,
+    code,
     hasUnevaluatedChanges,
   } = useStrudel();
-  const { startNewThread, sendThreadMessage } = useTamboThread();
+  const { startNewThread, isIdle } = useTamboThread();
+  const { setValue, submit } = useTamboThreadInput();
 
-  const handleFixError = React.useCallback(() => {
-    // Example fix: just clear errors and add a message to the thread
-    sendThreadMessage("Please fix the errors in my code.", {
-      additionalContext: { error },
-    });
-  }, [error, sendThreadMessage]);
+  const handleFixError = React.useCallback(async () => {
+    // Don't allow if already processing
+    if (!isIdle) return;
+
+    const errorMessage = typeof error === "string" ? error : error?.message;
+    const errorType = error ? categorizeError(error) : "unknown";
+
+    // Build a detailed message with full context for the AI
+    const contextMessage = `Fix this error in my Strudel code:
+
+**Error Type:** ${errorType}
+**Error Message:** ${errorMessage}
+
+**Current Code:**
+\`\`\`javascript
+${code}
+\`\`\`
+
+Please fix the error and update the REPL with corrected code.`;
+
+    const sendFixRequest = async () => {
+      setValue(contextMessage);
+      await submit({
+        streamResponse: true,
+      });
+    };
+
+    try {
+      // Clear the error immediately when user requests a fix
+      StrudelService.instance().clearError();
+      await sendFixRequest();
+    } catch (err) {
+      console.error("Failed to send fix error message:", err);
+      // Check for thread-related errors more specifically
+      // Look for specific thread error patterns to avoid false positives
+      const errStr = String(err);
+      const isThreadError =
+        errStr.includes("thread not found") ||
+        errStr.includes("invalid thread") ||
+        errStr.includes("Thread does not exist") ||
+        (errStr.includes("thread") && errStr.includes("error"));
+
+      if (isThreadError) {
+        try {
+          await startNewThread();
+          await sendFixRequest();
+        } catch (newThreadErr) {
+          console.error("Failed to create new thread:", newThreadErr);
+        }
+      }
+    }
+  }, [error, code, isIdle, setValue, submit, startNewThread]);
 
   return (
     <>

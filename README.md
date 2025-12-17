@@ -1,4 +1,4 @@
-# Strudel AI
+# StrudelLM
 
 An AI-powered live coding music environment that combines [Strudel](https://strudel.cc/) with [Tambo AI](https://tambo.co) to generate music patterns through natural language.
 
@@ -14,7 +14,7 @@ This app integrates Strudel with Tambo AI to create an AI assistant that can wri
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        Strudel AI                               │
+│                        StrudelLM                               │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │   ┌─────────────┐    ┌─────────────┐    ┌─────────────────┐    │

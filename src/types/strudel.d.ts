@@ -55,7 +55,11 @@ declare module "@strudel/webaudio" {
    * samples('shabda/speech/fr-FR/f:chocolat')
    * s("chocolat*4")
    */
-  export function samples(source: string | { [key: string]: string[] }, baseUrl?: string, options?: { prebake?: boolean; tag?: string }): Promise<void>;
+  export function samples(
+    source: string | { [key: string]: string[] },
+    baseUrl?: string,
+    options?: { prebake?: boolean; tag?: string },
+  ): Promise<void>;
 }
 
 declare module "@strudel/transpiler" {
@@ -65,9 +69,7 @@ declare module "@strudel/transpiler" {
 
 declare module "@strudel/core" {
   /** Register modules in evaluation scope */
-  export function evalScope(
-    ...modules: Promise<unknown>[]
-  ): Promise<void>;
+  export function evalScope(...modules: Promise<unknown>[]): Promise<void>;
 }
 
 declare module "@strudel/soundfonts" {
@@ -86,15 +88,15 @@ declare module "@strudel/tonal" {
 declare module "@strudel/draw" {
   /** Draw haps visualization on a canvas */
   export function setTheme(settings: {
-    background: string
-    foreground: string
-    caret: string
-    selection: string
-    selectionMatch: string
-    lineHighlight: string
-    lineBackground: string
-    gutterBackground: string
-    gutterForeground: string
+    background: string;
+    foreground: string;
+    caret: string;
+    selection: string;
+    selectionMatch: string;
+    lineHighlight: string;
+    lineBackground: string;
+    gutterBackground: string;
+    gutterForeground: string;
   }): void;
 
   /** Get drawing context for haps visualization */
@@ -105,12 +107,13 @@ declare module "@strudel/codemirror" {
   import { ViewUpdate, EditorView } from "@codemirror/view";
 
   interface StrudelReplState {
-    activeCode: string
-    code: string
-    pending: boolean
-    started: boolean
-    evalError: undefined
-    schedulerError: undefined
+    activeCode: string;
+    code: string;
+    pending: boolean;
+    started: boolean;
+    pattern?: unknown;
+    evalError: Error | string | undefined;
+    schedulerError: Error | string | undefined;
   }
 
   export interface StrudelMirrorOptions {
@@ -164,17 +167,17 @@ declare module "@strudel/codemirror" {
     evaluate(): Promise<void>;
     /** Current editor state */
     repl: {
-      evaluate: (code: string, autoplay: boolean) => Promise<void>
-      setCode: (b) => void
-      state: StrudelReplState
+      evaluate: (code: string, autoplay: boolean) => Promise<void>;
+      setCode: (b) => void;
+      state: StrudelReplState;
       scheduler: {
-        started: boolean
-      }
-      start: () => void
-      pause: () => void
-      stop: () => void
-      toggle: () => void
-    }
+        started: boolean;
+      };
+      start: () => void;
+      pause: () => void;
+      stop: () => void;
+      toggle: () => void;
+    };
     /** Set the editor state */
     setState(state: unknown): void;
     /** Toggle playback */

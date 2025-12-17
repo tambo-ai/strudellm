@@ -27,18 +27,34 @@ import {
 import { StrudelRepl } from "@/strudel/components/strudel-repl";
 import { LoadingScreen } from "@/components/loading/loading-screen";
 import { ApiKeyMissing } from "@/components/api-key-missing";
+
+import { StrudelStorageSync } from "@/components/strudel-storage-sync";
 import { components, tools } from "@/lib/tambo";
 import { LoadingContextProvider } from "@/components/loading/context";
+import { JazzAndAuthProvider } from "@/lib/providers";
 import type { Suggestion } from "@tambo-ai/react";
-import { TamboProvider, useTamboThread, useTamboThreadList } from "@tambo-ai/react";
+import {
+  TamboProvider,
+  useTamboThread,
+  useTamboThreadList,
+  useTambo,
+} from "@tambo-ai/react";
+import { useIsAuthenticated } from "jazz-tools/react";
 import * as React from "react";
 import { Frame } from "@/components/layout/frame";
 import { Main } from "@/components/layout/main";
 import { Sidebar, SidebarContent } from "@/components/layout/sidebar";
 import { useLoadingContext as useLoadingState } from "@/components/loading/context";
-import { StrudelProvider, useStrudel } from "@/strudel/context/strudel-provider";
+import {
+  StrudelProvider,
+  useStrudel,
+} from "@/strudel/context/strudel-provider";
 import { StrudelStatusBar } from "@/strudel/components/strudel-status-bar";
 import { StrudelService } from "@/strudel/lib/service";
+import { useStrudelStorage } from "@/hooks/use-strudel-storage";
+import { BetaModal } from "@/components/beta-modal";
+
+const BETA_MODAL_SHOWN_KEY = "strudel-beta-modal-shown-v1";
 
 /**
  * Context helper that provides the current Strudel REPL state to the AI.
@@ -54,20 +70,43 @@ const strudelContextHelper = () => {
   };
 };
 
-// Storage key for context
+// Storage key for anonymous context
 const CONTEXT_KEY_STORAGE = "strudel-ai-context-key";
 
-// Get or create user-specific context key (persists across sessions)
-const getOrCreateContextKey = (): string => {
+// Get or create anonymous context key (for users not logged in)
+const getOrCreateAnonymousContextKey = (): string => {
   if (typeof window === "undefined") return "";
 
   let contextKey = localStorage.getItem(CONTEXT_KEY_STORAGE);
   if (!contextKey) {
-    contextKey = `strudel-ai-${crypto.randomUUID()}`;
+    contextKey = `strudel-ai-anon-${crypto.randomUUID()}`;
     localStorage.setItem(CONTEXT_KEY_STORAGE, contextKey);
   }
   return contextKey;
 };
+
+// Hook to get context key (user ID if logged in, anonymous otherwise)
+function useContextKey(): string {
+  const { isAuthenticated, isLoaded } = useStrudelStorage();
+  const [anonymousKey] = React.useState(getOrCreateAnonymousContextKey);
+
+  // If user is logged in, use a persistent key stored in localStorage
+  // This ensures the same user gets the same context key across sessions
+  if (isAuthenticated && isLoaded) {
+    // For authenticated users, we use a separate persistent key
+    // that gets created once and stored (similar to anonymous key)
+    const AUTH_CONTEXT_KEY_STORAGE = "strudel-ai-auth-context-key";
+    let authKey = localStorage.getItem(AUTH_CONTEXT_KEY_STORAGE);
+    if (!authKey) {
+      authKey = `strudel-user-${crypto.randomUUID()}`;
+      localStorage.setItem(AUTH_CONTEXT_KEY_STORAGE, authKey);
+    }
+    return authKey;
+  }
+
+  // Otherwise use anonymous key
+  return anonymousKey;
+}
 
 const strudelSuggestions: Suggestion[] = [
   {
@@ -92,13 +131,56 @@ const strudelSuggestions: Suggestion[] = [
 
 function AppContent() {
   const [threadInitialized, setThreadInitialized] = React.useState(false);
-  const [contextKey] = React.useState(getOrCreateContextKey);
+  const [replInitialized, setReplInitialized] = React.useState(false);
+  const [showBetaModal, setShowBetaModal] = React.useState(false);
+  const contextKey = useContextKey();
   const { isPending } = useLoadingState();
-  const { isReady: strudelIsReady, setThreadId } = useStrudel();
-  const { thread, startNewThread, switchCurrentThread } = useTamboThread();
+  const isAuthenticated = useIsAuthenticated();
+  const {
+    isReady: strudelIsReady,
+    setThreadId,
+    currentReplId,
+    setReplId,
+    initializeRepl,
+    setIsAiUpdating,
+  } = useStrudel();
+  // Use storage hook directly for reactive isLoaded and isAuthenticated state
+  const {
+    isLoaded: isStorageLoaded,
+    attachThreadToRepl,
+    getThreadReplId,
+    isReplArchived,
+    unarchiveRepl,
+  } = useStrudelStorage();
+  const { thread, startNewThread, switchCurrentThread, isIdle } =
+    useTamboThread();
+  const { generationStage } = useTambo();
   const { data: threadList, isSuccess: threadListLoaded } = useTamboThreadList({
     contextKey,
   });
+
+  // Track AI generation state to lock editor during updates
+  React.useEffect(() => {
+    // Show overlay when AI is actively working (not idle and in a generation stage)
+    const isGenerating =
+      !isIdle && generationStage !== "IDLE" && generationStage !== "COMPLETE";
+    setIsAiUpdating(isGenerating);
+  }, [isIdle, generationStage, setIsAiUpdating]);
+
+  // Show beta modal on first login
+  React.useEffect(() => {
+    if (isAuthenticated && !localStorage.getItem(BETA_MODAL_SHOWN_KEY)) {
+      setShowBetaModal(true);
+      localStorage.setItem(BETA_MODAL_SHOWN_KEY, "true");
+    }
+  }, [isAuthenticated]);
+
+  // Initialize REPL on startup - wait for storage to be loaded (Jazz synced)
+  React.useEffect(() => {
+    if (!strudelIsReady || !isStorageLoaded || replInitialized) return;
+    initializeRepl();
+    setReplInitialized(true);
+  }, [strudelIsReady, isStorageLoaded, replInitialized, initializeRepl]);
 
   // Initialize: select most recent thread or create new
   React.useEffect(() => {
@@ -111,14 +193,46 @@ function AppContent() {
       startNewThread();
     }
     setThreadInitialized(true);
-  }, [strudelIsReady, threadListLoaded, threadInitialized, threadList, switchCurrentThread, startNewThread]);
+  }, [
+    strudelIsReady,
+    threadListLoaded,
+    threadInitialized,
+    threadList,
+    switchCurrentThread,
+    startNewThread,
+  ]);
 
-  // Sync thread ID to Strudel service (handles code persistence)
+  // Sync thread ID to Strudel service
   React.useEffect(() => {
     if (thread) {
       setThreadId(thread.id);
     }
   }, [thread, setThreadId]);
+
+  // Attach thread to current REPL only if thread doesn't already have a REPL association
+  // This prevents overwriting existing associations when switching tabs
+  React.useEffect(() => {
+    if (thread && currentReplId) {
+      const existingReplId = getThreadReplId(thread.id);
+      if (!existingReplId) {
+        // Thread is new/unassociated - attach it to the current REPL
+        attachThreadToRepl(thread.id, currentReplId);
+      }
+    }
+  }, [thread, currentReplId, getThreadReplId, attachThreadToRepl]);
+
+  // Unarchive REPL when switching to a thread that's associated with an archived REPL
+  // This brings the REPL back into the tabs when opening its associated chat
+  React.useEffect(() => {
+    if (thread) {
+      const replId = getThreadReplId(thread.id);
+      if (replId && isReplArchived(replId)) {
+        unarchiveRepl(replId);
+        // Also switch to that REPL
+        setReplId(replId);
+      }
+    }
+  }, [thread, getThreadReplId, isReplArchived, unarchiveRepl, setReplId]);
 
   if (isPending || !strudelIsReady || !thread) {
     return <LoadingScreen />;
@@ -172,6 +286,9 @@ function AppContent() {
         <ThreadHistorySearch />
         <ThreadHistoryList />
       </ThreadHistory>
+
+      {/* Beta Modal */}
+      {showBetaModal && <BetaModal onClose={() => setShowBetaModal(false)} />}
     </Frame>
   );
 }
@@ -184,20 +301,23 @@ export default function Home() {
   }
 
   return (
-    <LoadingContextProvider>
-      <StrudelProvider>
-        <TamboProvider
-          tamboUrl={process.env.NEXT_PUBLIC_TAMBO_URL}
-          apiKey={apiKey}
-          tools={tools}
-          components={components}
-          contextHelpers={{
-            strudelState: strudelContextHelper,
-          }}
-        >
-          <AppContent />
-        </TamboProvider>
-      </StrudelProvider>
-    </LoadingContextProvider>
+    <JazzAndAuthProvider>
+      <LoadingContextProvider>
+        <StrudelProvider>
+          <StrudelStorageSync />
+          <TamboProvider
+            tamboUrl={process.env.NEXT_PUBLIC_TAMBO_URL}
+            apiKey={apiKey}
+            tools={tools}
+            components={components}
+            contextHelpers={{
+              strudelState: strudelContextHelper,
+            }}
+          >
+            <AppContent />
+          </TamboProvider>
+        </StrudelProvider>
+      </LoadingContextProvider>
+    </JazzAndAuthProvider>
   );
 }

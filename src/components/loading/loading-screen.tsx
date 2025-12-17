@@ -15,17 +15,15 @@ export interface LoadingScreenProps {
   onStart?: () => void;
 }
 
-export function LoadingScreen({
-  onStart,
-}: LoadingScreenProps) {
-  const { isReady, message, progress} = useLoadingContext()
+export function LoadingScreen({ onStart }: LoadingScreenProps) {
+  const { isReady, message, progress } = useLoadingContext();
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-6 max-w-md px-8">
         {/* Logo / Title */}
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-primary mb-1">Strudel AI</h1>
+          <h1 className="text-2xl font-bold text-primary mb-1">StrudelLM</h1>
           <p className="text-sm text-muted-foreground">
             Live coding with AI assistance
           </p>
@@ -37,7 +35,7 @@ export function LoadingScreen({
             <div
               className={cn(
                 "h-full bg-primary transition-all duration-300",
-                !isReady && "animate-pulse"
+                !isReady && "animate-pulse",
               )}
               style={{ width: `${Math.min(progress, 100)}%` }}
             />
@@ -54,7 +52,7 @@ export function LoadingScreen({
             className={cn(
               "px-6 py-2 bg-primary text-primary-foreground rounded",
               "hover:bg-primary/90 transition-colors",
-              "text-sm font-medium"
+              "text-sm font-medium",
             )}
           >
             Start
