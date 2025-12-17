@@ -34,6 +34,7 @@ type CodeChangeCallback = (state: StrudelReplState) => void;
 
 const VISUALIZATIONS_HIDDEN_CLASS = "strudel-visualizations-hidden";
 const VISUALIZATIONS_HIDDEN_STYLE_ID = "strudel-visualizations-hidden-style";
+const STRUDEL_ROOT_ATTRIBUTE = "data-strudel-root";
 
 const DEFAULT_CODE = `// Welcome to StrudelLM!
 // Write patterns here or ask the AI for help
@@ -107,11 +108,11 @@ export class StrudelService {
 
     const styleEl = document.createElement("style");
     styleEl.id = VISUALIZATIONS_HIDDEN_STYLE_ID;
-    styleEl.innerHTML = `
-      .${VISUALIZATIONS_HIDDEN_CLASS} [id*="_widget__pianoroll_"],
-      .${VISUALIZATIONS_HIDDEN_CLASS} [id*="_widget__spectrum_"],
-      .${VISUALIZATIONS_HIDDEN_CLASS} [id*="_widget__scope_"],
-      .${VISUALIZATIONS_HIDDEN_CLASS} [id*="_widget__waveform_"] {
+    styleEl.textContent = `
+      [${STRUDEL_ROOT_ATTRIBUTE}].${VISUALIZATIONS_HIDDEN_CLASS} [id*="_widget__pianoroll_"],
+      [${STRUDEL_ROOT_ATTRIBUTE}].${VISUALIZATIONS_HIDDEN_CLASS} [id*="_widget__spectrum_"],
+      [${STRUDEL_ROOT_ATTRIBUTE}].${VISUALIZATIONS_HIDDEN_CLASS} [id*="_widget__scope_"],
+      [${STRUDEL_ROOT_ATTRIBUTE}].${VISUALIZATIONS_HIDDEN_CLASS} [id*="_widget__waveform_"] {
         display: none !important;
       }
     `;
@@ -662,8 +663,15 @@ export class StrudelService {
       const currentCode = this._state.code || DEFAULT_CODE;
 
       const oldEditor = this.editorInstance;
+
+      if (this.containerElement && this.containerElement !== container) {
+        this.containerElement.innerHTML = "";
+        this.containerElement.removeAttribute(STRUDEL_ROOT_ATTRIBUTE);
+      }
+
       this.containerElement = container;
       this.containerElement.innerHTML = "";
+      this.containerElement.setAttribute(STRUDEL_ROOT_ATTRIBUTE, "true");
 
       // Create the editor
       this.editorInstance = new StrudelMirror({
@@ -737,6 +745,7 @@ export class StrudelService {
 
     if (this.containerElement) {
       this.containerElement.innerHTML = "";
+      this.containerElement.removeAttribute(STRUDEL_ROOT_ATTRIBUTE);
       this.containerElement = null;
     }
   }
