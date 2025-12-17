@@ -1,9 +1,8 @@
 import "server-only";
 
 import { randomUUID } from "crypto";
-import { Pool } from "pg";
 
-import { waitForDatabase } from "@/lib/auth";
+import { getPostgresPool, waitForDatabase } from "@/lib/auth";
 
 export type SongShare = {
   id: string;
@@ -13,39 +12,12 @@ export type SongShare = {
   createdAt: number;
 };
 
-const databaseUrl = process.env.DATABASE_URL;
-
-let pool: Pool | null = null;
-
-function getPool(): Pool {
-  if (pool) return pool;
-
-  if (!databaseUrl) {
-    throw new Error(
-      "DATABASE_URL is required to persist song shares. Configure a Postgres database and set DATABASE_URL.",
-    );
-  }
-
-  if (!databaseUrl.startsWith("postgres")) {
-    throw new Error(
-      "DATABASE_URL must be a Postgres connection string to persist song shares.",
-    );
-  }
-
-  pool = new Pool({
-    connectionString: databaseUrl,
-    max: 5,
-  });
-
-  return pool;
-}
-
 export async function getLatestSongShareCreatedAt(
   ownerUserId: string,
 ): Promise<number | null> {
   await waitForDatabase();
 
-  const pool = getPool();
+  const pool = getPostgresPool();
   const result = await pool.query(
     `SELECT created_at FROM song_share WHERE owner_user_id = $1 ORDER BY created_at DESC LIMIT 1`,
     [ownerUserId],
@@ -69,7 +41,7 @@ export async function createSongShare(input: {
     createdAt: Date.now(),
   };
 
-  const pool = getPool();
+  const pool = getPostgresPool();
   await pool.query(
     `INSERT INTO song_share (id, owner_user_id, code, title, created_at) VALUES ($1, $2, $3, $4, $5)`,
     [share.id, share.ownerUserId, share.code, share.title, share.createdAt],
@@ -80,7 +52,7 @@ export async function createSongShare(input: {
 export async function getSongShare(shareId: string): Promise<SongShare | null> {
   await waitForDatabase();
 
-  const pool = getPool();
+  const pool = getPostgresPool();
   const result = await pool.query(
     `SELECT id, owner_user_id, code, title, created_at FROM song_share WHERE id = $1 LIMIT 1`,
     [shareId],

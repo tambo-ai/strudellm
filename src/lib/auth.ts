@@ -1,4 +1,4 @@
-import { betterAuth } from "better-auth";
+import { betterAuth, type BetterAuthPlugin } from "better-auth";
 import { magicLink } from "better-auth/plugins";
 import Database from "better-sqlite3";
 import { jazzPlugin } from "jazz-tools/better-auth/auth/server";
@@ -17,6 +17,43 @@ const resend =
     ? new Resend(process.env.RESEND_API_KEY)
     : null;
 
+const songSharePlugin = {
+  id: "song-share",
+  schema: {
+    song_share: {
+      fields: {
+        ownerUserId: {
+          type: "string",
+          required: true,
+          fieldName: "owner_user_id",
+          references: {
+            model: "user",
+            field: "id",
+            onDelete: "cascade",
+          },
+          index: true,
+        },
+        code: {
+          type: "string",
+          required: true,
+        },
+        title: {
+          type: "string",
+          required: false,
+        },
+        createdAt: {
+          type: "number",
+          bigint: true,
+          required: true,
+          fieldName: "created_at",
+        },
+      },
+    },
+  },
+} satisfies BetterAuthPlugin;
+
+const migrationPlugins = [jazzPlugin(), songSharePlugin] satisfies BetterAuthPlugin[];
+
 async function addUserToResendSegment(email: string | null | undefined) {
   if (!email || !resend || !resendSegmentId) return;
 
@@ -34,12 +71,12 @@ async function addUserToResendSegment(email: string | null | undefined) {
 
 let migrationsPromise: Promise<void> | null = null;
 let schemaPatchPromise: Promise<void> | null = null;
-let songShareSchemaPromise: Promise<void> | null = null;
 
 async function ensureMigrations(dialect: PostgresDialect) {
   if (migrationsPromise) return migrationsPromise;
   const { runMigrations } = await getMigrations({
     database: { dialect, type: "postgres" },
+    plugins: migrationPlugins,
   });
   migrationsPromise = runMigrations();
   return migrationsPromise;
@@ -62,29 +99,15 @@ async function ensureJazzColumns(pool: Pool) {
   return schemaPatchPromise;
 }
 
-async function ensureSongShareSchema(pool: Pool) {
-  if (songShareSchemaPromise) return songShareSchemaPromise;
+let postgresPool: Pool | null = null;
 
-  songShareSchemaPromise = (async () => {
-    try {
-      await pool.query(`
-        CREATE TABLE IF NOT EXISTS song_share (
-          id text PRIMARY KEY,
-          owner_user_id text NOT NULL,
-          code text NOT NULL,
-          title text,
-          created_at bigint NOT NULL
-        );
-      `);
-      await pool.query(
-        `CREATE INDEX IF NOT EXISTS song_share_owner_user_id_idx ON song_share(owner_user_id);`,
-      );
-    } catch (error) {
-      console.error("Failed to ensure song_share schema", error);
-    }
-  })();
-
-  return songShareSchemaPromise;
+export function getPostgresPool(): Pool {
+  if (!postgresPool) {
+    throw new Error(
+      "Song sharing requires a Postgres DATABASE_URL. Configure a Postgres database and set DATABASE_URL.",
+    );
+  }
+  return postgresPool;
 }
 
 // Track if database is ready for use
@@ -97,13 +120,13 @@ function getDatabaseConfig() {
       connectionString: databaseUrl,
       max: 5,
     });
+    postgresPool = pool;
     const dialect = new PostgresDialect({ pool });
 
     // Run Better Auth migrations once (creates user/session tables)
     // Store the promise so we can await it if needed before auth operations
     dbReadyPromise = ensureMigrations(dialect).then(async () => {
       await ensureJazzColumns(pool);
-      await ensureSongShareSchema(pool);
     });
 
     return {
