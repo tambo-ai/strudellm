@@ -1168,6 +1168,11 @@ const keybindings = getKeybindings();
       // On any error, revert to previous working code
       if (operationId === this.updateOperationId) {
         await this.revertToCode(previousCode, wasPlaying, source);
+      } else {
+        console.warn(
+          "[StrudelService] updateAndPlay: superseded operation error:",
+          error,
+        );
       }
 
       return { success: false, error: (error as Error).message };
@@ -1246,6 +1251,8 @@ const keybindings = getKeybindings();
   dispose(): void {
     this.stop();
     this.detach();
+    this.unregisterGlobalErrorHandlers();
+    this.removeConsoleErrorFilter();
 
     this.loadingCallbacks = [];
     this.stateChangeCallbacks = [];
