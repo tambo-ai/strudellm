@@ -927,6 +927,7 @@ const keybindings = getKeybindings();
    * Detach the editor from its container
    */
   detach(): void {
+    this.pendingSchedulerWaitCancel?.();
     this.unregisterGlobalErrorHandlers();
     this.removeConsoleErrorFilter();
 
@@ -969,6 +970,7 @@ const keybindings = getKeybindings();
 
   stop = (): void => {
     this.editorInstance?.repl.stop();
+    this.pendingSchedulerWaitCancel?.();
     this.unregisterGlobalErrorHandlers();
     this.removeConsoleErrorFilter();
   };
