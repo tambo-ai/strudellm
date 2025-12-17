@@ -1,4 +1,4 @@
-import { betterAuth, type BetterAuthPlugin } from "better-auth";
+import { betterAuth } from "better-auth";
 import { magicLink } from "better-auth/plugins";
 import Database from "better-sqlite3";
 import { jazzPlugin } from "jazz-tools/better-auth/auth/server";
@@ -6,6 +6,8 @@ import { Resend } from "resend";
 import { Pool } from "pg";
 import { PostgresDialect } from "kysely";
 import { getMigrations } from "better-auth/db";
+
+import { songSharePlugin } from "@/lib/song-share-schema";
 
 const isProduction = process.env.NODE_ENV === "production";
 const databaseUrl = process.env.DATABASE_URL;
@@ -17,42 +19,7 @@ const resend =
     ? new Resend(process.env.RESEND_API_KEY)
     : null;
 
-const songSharePlugin = {
-  id: "song-share",
-  schema: {
-    song_share: {
-      fields: {
-        ownerUserId: {
-          type: "string",
-          required: true,
-          fieldName: "owner_user_id",
-          references: {
-            model: "user",
-            field: "id",
-            onDelete: "cascade",
-          },
-          index: true,
-        },
-        code: {
-          type: "string",
-          required: true,
-        },
-        title: {
-          type: "string",
-          required: false,
-        },
-        createdAt: {
-          type: "number",
-          bigint: true,
-          required: true,
-          fieldName: "created_at",
-        },
-      },
-    },
-  },
-} satisfies BetterAuthPlugin;
-
-const migrationPlugins = [jazzPlugin(), songSharePlugin] satisfies BetterAuthPlugin[];
+const migrationPlugins = [jazzPlugin(), songSharePlugin];
 
 async function addUserToResendSegment(email: string | null | undefined) {
   if (!email || !resend || !resendSegmentId) return;
@@ -118,7 +85,7 @@ function initPostgresPool(): Pool | null {
 export function getPostgresPool(): Pool {
   if (!postgresPool) {
     throw new Error(
-      "Postgres database is not configured. Set a Postgres DATABASE_URL to enable persistence.",
+      "Postgres database is not configured. Song sharing requires a Postgres DATABASE_URL to be set.",
     );
   }
   return postgresPool;

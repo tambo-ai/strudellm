@@ -52,7 +52,8 @@ export async function POST(req: NextRequest) {
   const latestCreatedAt = await getLatestSongShareCreatedAt(session.user.id);
   const now = Date.now();
   if (latestCreatedAt !== null) {
-    const diff = now - latestCreatedAt;
+    const rawDiff = now - latestCreatedAt;
+    const diff = rawDiff < 0 ? 0 : rawDiff;
 
     if (diff < MIN_TIME_BETWEEN_SHARES_MS) {
       const retryAfterSeconds = Math.ceil(
