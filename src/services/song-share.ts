@@ -40,6 +40,29 @@ function getPool(): Pool {
   return pool;
 }
 
+export async function getLatestSongShareCreatedAt(
+  ownerUserId: string,
+): Promise<number | null> {
+  await ensureSchema();
+
+  const client = getDbClient();
+  if (client.kind === "postgres") {
+    const result = await client.pool.query(
+      `SELECT created_at FROM song_share WHERE owner_user_id = $1 ORDER BY created_at DESC LIMIT 1`,
+      [ownerUserId],
+    );
+    const row = result.rows[0] as { created_at: string | number } | undefined;
+    return row ? Number(row.created_at) : null;
+  }
+
+  const row = client.db
+    .prepare(
+      `SELECT created_at as createdAt FROM song_share WHERE owner_user_id = ? ORDER BY created_at DESC LIMIT 1`,
+    )
+    .get(ownerUserId) as { createdAt: number } | undefined;
+  return row ? row.createdAt : null;
+}
+
 export async function createSongShare(input: {
   ownerUserId: string;
   code: string;

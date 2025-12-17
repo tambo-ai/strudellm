@@ -1,10 +1,14 @@
 import { auth } from "@/lib/auth";
-import { createSongShare } from "@/services/song-share";
+import {
+  createSongShare,
+  getLatestSongShareCreatedAt,
+} from "@/services/song-share";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v3";
 
 const MAX_CODE_LENGTH = 100_000;
 const MAX_TITLE_LENGTH = 200;
+const MIN_TIME_BETWEEN_SHARES_MS = 60_000;
 
 const createShareSchema = z.object({
   code: z.string().min(1).max(MAX_CODE_LENGTH),
@@ -30,9 +34,29 @@ export async function POST(req: NextRequest) {
 
   const parsed = createShareSchema.safeParse(body);
   if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
+
+  const latestCreatedAt = await getLatestSongShareCreatedAt(session.user.id);
+  const now = Date.now();
+  if (
+    typeof latestCreatedAt === "number" &&
+    now - latestCreatedAt < MIN_TIME_BETWEEN_SHARES_MS
+  ) {
+    const retryAfterSeconds = Math.ceil(
+      (MIN_TIME_BETWEEN_SHARES_MS - (now - latestCreatedAt)) / 1000,
+    );
     return NextResponse.json(
-      { error: "Invalid request", issues: parsed.error.issues },
-      { status: 400 },
+      {
+        error:
+          "Rate limit exceeded. Please wait before creating another share.",
+      },
+      {
+        status: 429,
+        headers: {
+          "retry-after": retryAfterSeconds.toString(),
+        },
+      },
     );
   }
 
