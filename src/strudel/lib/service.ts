@@ -1069,7 +1069,7 @@ const keybindings = getKeybindings();
       source?: UpdateSource;
     },
   ) => {
-    const source = options?.source ?? "ai";
+    const source = options?.source ?? "user";
 
     this.updateOperationId += 1;
     const operationId = this.updateOperationId;

@@ -79,10 +79,10 @@ export function StrudelStatusBar() {
         ? categorizeError(error)
         : "unknown";
 
-    const attachmentKey = [missingSample ?? "", errorMessage ?? "", code].join(
-      "|",
+    const attachmentKey = JSON.stringify({ missingSample, errorMessage, code });
+    const existing = attachments.find(
+      (a) => a.metadata?.kind === "strudel_error",
     );
-    const existing = attachments.find((a) => a.name === "Strudel Error");
 
     if (!existing || existing.metadata?.attachmentKey !== attachmentKey) {
       if (existing) {
@@ -93,6 +93,7 @@ export function StrudelStatusBar() {
         name: "Strudel Error",
         icon: <AlertCircle className="w-3 h-3" />,
         metadata: {
+          kind: "strudel_error",
           attachmentKey,
           errorType,
           errorMessage,
