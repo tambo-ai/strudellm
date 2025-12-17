@@ -4,8 +4,8 @@ import { cn } from "@/lib/utils";
 import {
   getKeybindings,
   setEditorKeybindings,
+  DEFAULT_KEYBINDINGS,
 } from "@/lib/editor-preferences";
-import { StrudelService } from "@/strudel/lib/service";
 import { useTamboStreamStatus } from "@tambo-ai/react";
 import * as React from "react";
 import { z } from "zod/v3";
@@ -37,28 +37,26 @@ export const KeybindingsPicker = React.forwardRef<
   const initializedRef = React.useRef(false);
 
   // Local state for selected keybindings and pending change
-  const [selectedKeybindings, setSelectedKeybindings] = React.useState<
-    string | null
-  >(null);
+  const [selectedKeybindings, setSelectedKeybindings] = React.useState<string>(
+    DEFAULT_KEYBINDINGS,
+  );
   const [pendingKeybindings, setPendingKeybindings] = React.useState<
     string | null
   >(null);
-  const [isApplying, setIsApplying] = React.useState(false);
 
   // Initialize from localStorage or AI prop on mount
   React.useEffect(() => {
     if (initializedRef.current) return;
     initializedRef.current = true;
 
-    // AI prop takes priority, then localStorage
-    if (keybindings) {
-      setSelectedKeybindings(keybindings);
+    const savedKeybindings = getKeybindings();
+    setSelectedKeybindings(savedKeybindings || DEFAULT_KEYBINDINGS);
+
+    if (
+      keybindings &&
+      keybindings !== (savedKeybindings || DEFAULT_KEYBINDINGS)
+    ) {
       setPendingKeybindings(keybindings);
-    } else {
-      const savedKeybindings = getKeybindings();
-      if (savedKeybindings) {
-        setSelectedKeybindings(savedKeybindings);
-      }
     }
   }, [keybindings]);
 
@@ -66,7 +64,6 @@ export const KeybindingsPicker = React.forwardRef<
   React.useEffect(() => {
     if (!initializedRef.current) return;
     if (keybindings && keybindings !== selectedKeybindings) {
-      setSelectedKeybindings(keybindings);
       setPendingKeybindings(keybindings);
     }
   }, [keybindings, selectedKeybindings]);
@@ -75,20 +72,12 @@ export const KeybindingsPicker = React.forwardRef<
     setPendingKeybindings(value);
   };
 
-  const handleApplyAndRestart = async () => {
+  const handleSave = () => {
     if (!pendingKeybindings) return;
 
-    setIsApplying(true);
-    try {
-      // Save the preference
-      setEditorKeybindings(pendingKeybindings);
-      // Restart the editor to apply keybindings
-      await StrudelService.instance().applyKeybindingsAndRestart();
-      setSelectedKeybindings(pendingKeybindings);
-      setPendingKeybindings(null);
-    } finally {
-      setIsApplying(false);
-    }
+    setEditorKeybindings(pendingKeybindings);
+    setSelectedKeybindings(pendingKeybindings);
+    setPendingKeybindings(null);
   };
 
   const isStreaming = streamStatus.isStreaming;
@@ -132,7 +121,7 @@ export const KeybindingsPicker = React.forwardRef<
             <button
               key={option.value}
               onClick={() => handleKeybindingsSelect(option.value)}
-              disabled={isStreaming || isApplying}
+              disabled={isStreaming}
               className={cn(
                 "px-3 py-1.5 rounded-md text-sm border transition-all",
                 "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1",
@@ -156,8 +145,8 @@ export const KeybindingsPicker = React.forwardRef<
       {/* Apply button */}
       <div className="flex justify-end">
         <button
-          onClick={handleApplyAndRestart}
-          disabled={!hasChanges || isStreaming || isApplying}
+          onClick={handleSave}
+          disabled={!hasChanges || isStreaming}
           className={cn(
             "px-4 py-2 rounded-md text-sm font-medium transition-all",
             "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1",
@@ -167,13 +156,14 @@ export const KeybindingsPicker = React.forwardRef<
               : "bg-muted text-muted-foreground",
           )}
         >
-          {isApplying ? "Applying..." : "Apply & Restart Runtime"}
+          Save
         </button>
       </div>
 
       {/* Info text */}
       <p className="text-xs text-muted-foreground">
-        Changing keybindings requires restarting the editor runtime.
+        Keybindings are applied the next time the editor loads (refresh the
+        page).
       </p>
 
       {streamStatus.isError && streamStatus.streamError && (
