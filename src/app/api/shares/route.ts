@@ -34,6 +34,10 @@ export async function POST(req: NextRequest) {
 
   const parsed = createShareSchema.safeParse(body);
   if (!parsed.success) {
+    console.warn("Invalid /api/shares payload", {
+      userId: session.user.id,
+      issues: parsed.error.issues,
+    });
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
