@@ -67,7 +67,6 @@ async function ensureJazzColumns(pool: Pool) {
 }
 
 let postgresPool: Pool | null = null;
-
 function initPostgresPool(): Pool | null {
   if (!databaseUrl || !databaseUrl.startsWith("postgres")) return null;
 
