@@ -17,8 +17,8 @@ export function audioBufferToWavBlob(audioBuffer: AudioBuffer): Blob {
   if (!numChannels || numChannels < 1) {
     throw new Error("Cannot export WAV: AudioBuffer has no channels");
   }
-  if (!numFrames) {
-    throw new Error("Cannot export WAV: AudioBuffer has zero length");
+  if (!Number.isFinite(numFrames) || numFrames <= 0) {
+    throw new Error("Cannot export WAV: AudioBuffer has zero or invalid length");
   }
   if (!Number.isFinite(sampleRate) || sampleRate <= 0) {
     throw new Error("Cannot export WAV: Invalid sample rate");

@@ -175,6 +175,9 @@ export class StrudelService {
     if (!StrudelService.isValidCps(cps)) {
       throw new Error("Export failed: CPS must be greater than zero");
     }
+    if (!Number.isFinite(sampleRate) || sampleRate <= 0) {
+      throw new Error("Export failed: sample rate must be a positive number");
+    }
 
     const seconds = cycles / cps;
     if (!Number.isFinite(seconds) || seconds <= 0) {
