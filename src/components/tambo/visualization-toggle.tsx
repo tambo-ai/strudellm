@@ -71,28 +71,25 @@ function getDetectedVisualization(code: string): VisualizationOrOff {
   return null;
 }
 
-function stripVisualizationsFromCode(
-  code: string,
-): { detectedVisualization: VisualizationOrOff; strippedCode: string } {
-  let detectedVisualization: VisualizationOrOff = null;
+function stripVisualizationsFromCode(code: string): string {
   const updatedLines = code.split("\n").map((line) => {
-    const { type, strippedLine } = stripTrailingVisualizationFromLine(line);
-    if (type) detectedVisualization = type;
-    return strippedLine;
+    return stripTrailingVisualizationFromLine(line).strippedLine;
   });
 
-  return { detectedVisualization, strippedCode: updatedLines.join("\n") };
+  return updatedLines.join("\n");
 }
 
 function findNearestNonEmptyLineIndex(
   lines: string[],
   preferredIndex: number,
-  maxDistance: number = 8,
+  maxDistance?: number,
 ): number | null {
   if (preferredIndex < 0 || preferredIndex >= lines.length) return null;
   if (lines[preferredIndex]?.trim()) return preferredIndex;
 
-  for (let distance = 1; distance <= maxDistance; distance++) {
+  const limit = maxDistance ?? lines.length;
+
+  for (let distance = 1; distance <= limit; distance++) {
     const above = preferredIndex - distance;
     if (above >= 0 && lines[above]?.trim()) return above;
 
@@ -109,7 +106,7 @@ function setVisualization(
   cursorLineIndex: number | null,
 ): string {
   if (!next) {
-    return stripVisualizationsFromCode(code).strippedCode;
+    return stripVisualizationsFromCode(code);
   }
 
   const nextOption = VISUALIZATION_OPTIONS.find((o) => o.id === next);
@@ -117,37 +114,23 @@ function setVisualization(
     return code;
   }
 
-  const originalLines = code.split("\n");
-  const linesForTargeting = originalLines.map((line) => {
-    return stripTrailingVisualizationFromLine(line).strippedLine;
-  });
+  const strippedCode = stripVisualizationsFromCode(code);
+  const lines = strippedCode.split("\n");
 
   const preferredLineIndex = Math.min(
     Math.max(cursorLineIndex ?? 0, 0),
-    Math.max(linesForTargeting.length - 1, 0),
+    Math.max(lines.length - 1, 0),
   );
-  const targetIndex = findNearestNonEmptyLineIndex(
-    linesForTargeting,
-    preferredLineIndex,
-  );
+  const targetIndex = findNearestNonEmptyLineIndex(lines, preferredLineIndex);
 
   if (targetIndex === null) {
     return code;
   }
 
-  const { strippedCode } = stripVisualizationsFromCode(code);
-  const lines = strippedCode.split("\n");
-
-  if (targetIndex < 0 || targetIndex >= lines.length) {
-    return code;
-  }
-
   const originalLine = lines[targetIndex] ?? "";
-  const { strippedLine } = stripTrailingVisualizationFromLine(originalLine);
-
-  const withoutTrailingWhitespace = strippedLine.trimEnd();
+  const withoutTrailingWhitespace = originalLine.trimEnd();
   if (!withoutTrailingWhitespace.trim()) {
-    return strippedCode;
+    return code;
   }
 
   if (withoutTrailingWhitespace.endsWith(";")) {

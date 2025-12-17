@@ -32,6 +32,17 @@ import type {
 type LoadingCallback = (status: string, progress: number) => void;
 type CodeChangeCallback = (state: StrudelReplState) => void;
 
+type CursorAwareEditorInstance = {
+  getCursorLocation?: () => number;
+  editor?: {
+    state?: {
+      doc?: {
+        lineAt?: (pos: number) => { number: number };
+      };
+    };
+  };
+};
+
 const DEFAULT_CODE = `// Welcome to StrudelLM!
 // Write patterns here or ask the AI for help
 
@@ -490,9 +501,9 @@ export class StrudelService {
   getCursorLocation(): number | null {
     if (!this.editorInstance) return null;
 
-    const getCursorLocation = (this.editorInstance as unknown as {
-      getCursorLocation?: () => number;
-    }).getCursorLocation;
+    const getCursorLocation =
+      (this.editorInstance as unknown as CursorAwareEditorInstance)
+        .getCursorLocation;
 
     if (typeof getCursorLocation !== "function") return null;
     return getCursorLocation.call(this.editorInstance);
@@ -504,17 +515,8 @@ export class StrudelService {
     const cursorLocation = this.getCursorLocation();
     if (cursorLocation === null) return null;
 
-    const editorInstance = this.editorInstance as unknown as {
-      editor?: {
-        state?: {
-          doc?: {
-            lineAt?: (pos: number) => { number: number };
-          };
-        };
-      };
-    };
-
-    const lineAt = editorInstance.editor?.state?.doc?.lineAt;
+    const lineAt = (this.editorInstance as unknown as CursorAwareEditorInstance)
+      .editor?.state?.doc?.lineAt;
     if (typeof lineAt !== "function") return null;
 
     const line = lineAt(cursorLocation);
