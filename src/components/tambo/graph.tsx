@@ -321,10 +321,10 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
                   radius: 4,
                 }}
                 contentStyle={{
-                  backgroundColor: "white",
-                  border: "1px solid #e5e7eb",
+                  backgroundColor: "var(--popover)",
+                  border: "1px solid var(--border)",
                   borderRadius: "var(--radius)",
-                  color: "var(--foreground)",
+                  color: "var(--popover-foreground)",
                 }}
               />
               {showLegend && (
@@ -373,10 +373,10 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
                   strokeOpacity: 0.3,
                 }}
                 contentStyle={{
-                  backgroundColor: "white",
-                  border: "1px solid #e5e7eb",
+                  backgroundColor: "var(--popover)",
+                  border: "1px solid var(--border)",
                   borderRadius: "var(--radius)",
-                  color: "var(--foreground)",
+                  color: "var(--popover-foreground)",
                 }}
               />
               {showLegend && (
@@ -429,21 +429,20 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
                 cy="50%"
                 labelLine={false}
                 outerRadius={80}
-                fill="#8884d8"
+                fill="var(--primary)"
               />
               <RechartsCore.Tooltip
                 contentStyle={{
-                  backgroundColor: "white",
-                  border: "1px solid #e5e7eb",
+                  backgroundColor: "var(--popover)",
+                  border: "1px solid var(--border)",
                   borderRadius: "var(--radius)",
-                  color: "var(--foreground)",
-                  boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                  color: "var(--popover-foreground)",
                 }}
                 itemStyle={{
-                  color: "var(--foreground)",
+                  color: "var(--popover-foreground)",
                 }}
                 labelStyle={{
-                  color: "var(--foreground)",
+                  color: "var(--popover-foreground)",
                 }}
               />
               {showLegend && (

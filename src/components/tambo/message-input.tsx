@@ -59,7 +59,7 @@ const messageInputVariants = cva("w-full", {
       ].join(" "),
       bordered: [
         "[&>div]:bg-transparent",
-        "[&>div]:border-2 [&>div]:border-gray-300 [&>div]:dark:border-zinc-600",
+        "[&>div]:border-2 [&>div]:border-border",
         "[&>div]:shadow-none",
         "[&_textarea]:bg-transparent",
         "[&_textarea]:border-0",
@@ -670,7 +670,7 @@ const MCPIcon = () => {
       viewBox="0 0 24 24"
       width="24"
       height="24"
-      color="#000000"
+      className="text-current"
       fill="none"
     >
       <path

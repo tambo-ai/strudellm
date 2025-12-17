@@ -77,7 +77,7 @@ const CodeHeader = ({
         {!copied ? (
           <Copy className="h-4 w-4" />
         ) : (
-          <Check className="h-4 w-4 text-green-500" />
+          <Check className="h-4 w-4 text-success" />
         )}
       </button>
     </div>
@@ -115,7 +115,7 @@ export const createMarkdownComponents = (): Record<
             className={cn(
               "overflow-x-auto rounded-b-md bg-background",
               "[&::-webkit-scrollbar]:w-[6px]",
-              "[&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-md",
+              "[&::-webkit-scrollbar-thumb]:bg-muted-foreground/30 [&::-webkit-scrollbar-thumb]:rounded-md",
               "[&::-webkit-scrollbar:horizontal]:h-[4px]",
             )}
           >

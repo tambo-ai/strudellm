@@ -32,7 +32,7 @@ export const metadata: Metadata = {
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
+    <div className="min-h-screen bg-zinc-950 text-zinc-50 flex flex-col">
       {/* Hero Section */}
       <main className="flex-1 flex flex-col items-center justify-center px-6 py-16 relative overflow-hidden">
         {/* Animated background elements */}
@@ -46,17 +46,17 @@ export default function LandingPage() {
         <div className="relative z-10 max-w-4xl mx-auto text-center">
           {/* Logo/Title */}
           <h1 className="text-5xl md:text-7xl font-bold mb-6 tracking-tight">
-            <span className="text-primary">Strudel</span>
-            <span className="text-foreground">LM</span>
+            <span className="text-emerald-400">Strudel</span>
+            <span className="text-zinc-50">LM</span>
           </h1>
 
           {/* Tagline */}
-          <p className="text-xl md:text-2xl text-muted-foreground mb-4 max-w-2xl mx-auto">
+          <p className="text-xl md:text-2xl text-zinc-400 mb-4 max-w-2xl mx-auto">
             Live coding music with AI assistance
           </p>
 
           {/* Description */}
-          <p className="text-base md:text-lg text-muted-foreground/80 mb-12 max-w-xl mx-auto leading-relaxed">
+          <p className="text-base md:text-lg text-zinc-400/80 mb-12 max-w-xl mx-auto leading-relaxed">
             Generate beats, melodies, and soundscapes through natural language.
             Powered by Strudel and AI.
           </p>
@@ -64,7 +64,7 @@ export default function LandingPage() {
           {/* CTA Button */}
           <Link
             href="/chat"
-            className="inline-flex items-center gap-2 px-8 py-4 bg-primary text-primary-foreground font-medium rounded-xl text-lg transition-all duration-200 hover:opacity-90 hover:scale-[1.02] active:scale-[0.98]"
+            className="inline-flex items-center gap-2 px-8 py-4 bg-emerald-500 text-zinc-950 font-medium rounded-xl text-lg transition-all duration-200 hover:opacity-90 hover:scale-[1.02] active:scale-[0.98]"
           >
             Start Creating
             <svg
@@ -86,13 +86,13 @@ export default function LandingPage() {
       </main>
 
       {/* Video Section - uncomment when video asset is ready
-      <section className="px-6 py-16 bg-card/50">
+      <section className="px-6 py-16 bg-zinc-900/50">
         <div className="max-w-4xl mx-auto">
           <h2 className="text-2xl md:text-3xl font-semibold text-center mb-8">
             See it in action
           </h2>
 
-          <div className="relative aspect-video bg-muted rounded-xl overflow-hidden border border-border">
+          <div className="relative aspect-video bg-zinc-800 rounded-xl overflow-hidden border border-zinc-700">
             <video
               className="w-full h-full object-cover"
               controls
@@ -103,7 +103,7 @@ export default function LandingPage() {
                 src="https://github.com/user-attachments/assets/YOUR_VIDEO.mp4"
                 type="video/mp4"
               />
-              <p className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+              <p className="absolute inset-0 flex items-center justify-center text-zinc-400">
                 Your browser does not support the video tag.
               </p>
             </video>
@@ -133,11 +133,11 @@ export default function LandingPage() {
       </section>
 
       {/* Open Source Section */}
-      <section className="px-6 py-16 border-t border-border">
+      <section className="px-6 py-16 border-t border-zinc-800">
         <div className="max-w-2xl mx-auto text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-6">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-zinc-800 mb-6">
             <svg
-              className="w-8 h-8 text-foreground"
+              className="w-8 h-8 text-zinc-50"
               fill="currentColor"
               viewBox="0 0 24 24"
               aria-hidden="true"
@@ -152,7 +152,7 @@ export default function LandingPage() {
           <h2 className="text-2xl md:text-3xl font-semibold mb-4">
             Open Source
           </h2>
-          <p className="text-muted-foreground mb-6 leading-relaxed">
+          <p className="text-zinc-400 mb-6 leading-relaxed">
             StrudelLM is completely open source. Check out the code, run it
             yourself, or contribute to the project.
           </p>
@@ -161,7 +161,7 @@ export default function LandingPage() {
               href="https://github.com/tambo-ai/strudellm"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-foreground text-background font-medium rounded-xl transition-all duration-200 hover:opacity-90"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-zinc-50 text-zinc-950 font-medium rounded-xl transition-all duration-200 hover:opacity-90"
             >
               <svg
                 className="w-5 h-5"
@@ -181,7 +181,7 @@ export default function LandingPage() {
               href="https://github.com/tambo-ai/strudellm/issues/new"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-6 py-3 border border-border rounded-xl text-foreground hover:bg-muted/50 transition-colors"
+              className="inline-flex items-center gap-2 px-6 py-3 border border-zinc-700 rounded-xl text-zinc-50 hover:bg-zinc-800/50 transition-colors"
             >
               Report an Issue
             </a>
@@ -190,7 +190,7 @@ export default function LandingPage() {
       </section>
 
       {/* Built with Tambo Section */}
-      <section className="px-6 py-20 border-t border-border">
+      <section className="px-6 py-20 border-t border-zinc-800">
         <div className="max-w-lg mx-auto text-center">
           <a
             href="https://tambo.co"
@@ -204,10 +204,10 @@ export default function LandingPage() {
               className="h-48 mx-auto mb-8 opacity-90 group-hover:opacity-100 transition-opacity"
             />
           </a>
-          <p className="text-lg text-foreground mb-3">
+          <p className="text-lg text-zinc-50 mb-3">
             Built by the Tambo team
           </p>
-          <p className="text-muted-foreground mb-6">
+          <p className="text-zinc-400 mb-6">
             Interested in building AI-powered apps like StrudelLM? Check out
             Tambo.
           </p>
@@ -215,7 +215,7 @@ export default function LandingPage() {
             href="https://docs.tambo.co"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-6 py-3 border border-border rounded-xl text-foreground hover:bg-muted/50 transition-colors"
+            className="inline-flex items-center gap-2 px-6 py-3 border border-zinc-700 rounded-xl text-zinc-50 hover:bg-zinc-800/50 transition-colors"
           >
             Go to Tambo Docs
             <svg
@@ -237,15 +237,15 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="px-6 py-8 border-t border-border">
-        <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
+      <footer className="px-6 py-8 border-t border-zinc-800">
+        <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-zinc-400">
           <p>
             Built with{" "}
             <a
               href="https://strudel.cc"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-primary hover:underline"
+              className="text-emerald-400 hover:underline"
             >
               Strudel
             </a>{" "}
@@ -254,14 +254,14 @@ export default function LandingPage() {
               href="https://tambo.co"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-primary hover:underline"
+              className="text-emerald-400 hover:underline"
             >
               Tambo
             </a>
           </p>
           <Link
             href="/chat"
-            className="hover:text-foreground transition-colors"
+            className="hover:text-zinc-50 transition-colors"
           >
             Go to App
           </Link>
@@ -279,9 +279,9 @@ function FeatureCard({
   description: string;
 }) {
   return (
-    <div className="p-6 rounded-xl bg-card border border-border">
-      <h3 className="text-lg font-medium mb-2 text-foreground">{title}</h3>
-      <p className="text-muted-foreground text-sm leading-relaxed">
+    <div className="p-6 rounded-xl bg-zinc-900 border border-zinc-800">
+      <h3 className="text-lg font-medium mb-2 text-zinc-50">{title}</h3>
+      <p className="text-zinc-400 text-sm leading-relaxed">
         {description}
       </p>
     </div>

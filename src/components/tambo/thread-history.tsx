@@ -283,7 +283,7 @@ const ThreadHistoryNewButton = React.forwardRef<
       title="New thread"
       {...props}
     >
-      <PlusIcon className="h-4 w-4 bg-green-600 rounded-full text-white" />
+      <PlusIcon className="h-4 w-4 bg-success rounded-full text-success-foreground" />
       <span
         className={cn(
           "text-sm font-medium whitespace-nowrap absolute left-8 pb-[2px] ",
@@ -332,7 +332,7 @@ const ThreadHistorySearch = React.forwardRef<
         )}
         title="Search threads"
       >
-        <SearchIcon className="h-4 w-4 text-gray-400" />
+        <SearchIcon className="h-4 w-4 text-muted-foreground" />
       </button>
 
       {/*visible when expanded with delay */}
@@ -346,7 +346,7 @@ const ThreadHistorySearch = React.forwardRef<
         )}
       >
         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <SearchIcon className="h-4 w-4 text-gray-400" />
+          <SearchIcon className="h-4 w-4 text-muted-foreground" />
         </div>
         <input
           ref={searchInputRef}

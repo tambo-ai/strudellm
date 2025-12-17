@@ -23,7 +23,7 @@ import {
   StrudelMirrorOptions,
   StrudelReplState,
 } from "@strudel/codemirror";
-import { getDrawContext, setTheme } from "@strudel/draw";
+import { getDrawContext } from "@strudel/draw";
 import type {
   StrudelStorageAdapter,
   ReplSummary,
@@ -469,33 +469,53 @@ export class StrudelService {
     }
   }
 
-  fixTheme(): void {
-    const themeSettings = {
-      background: "var(--card-background)",
-      foreground: "var(--card-foreground)",
-      caret: "var(--muted-foreground)",
-      selection: "color-mix(in oklch, var(--primary) 20%, transparent)",
-      selectionMatch: "color-mix(in oklch, var(--primary) 20%, transparent)",
-      lineHighlight: "color-mix(in oklch, var(--primary) 20%, transparent)",
-      lineBackground:
-        "color-mix(in oklch, var(--card-foreground) 20%, transparent)",
-      gutterBackground: "transparent",
-      gutterForeground: "var(--muted-foreground)",
-    };
-    const styleID = "strudel-theme-vars";
-    let styleEl = document.getElementById(styleID) as HTMLStyleElement | null;
-    if (!styleEl) {
-      styleEl = document.createElement("style");
-      styleEl.id = styleID;
-      document.head.appendChild(styleEl);
+  // ============================================
+  // Editor Runtime Restart (for keybindings)
+  // ============================================
+
+  /**
+   * Restart the editor runtime.
+   * Used when changing keybindings which require recreating the editor.
+   */
+  async applyKeybindingsAndRestart(): Promise<void> {
+    if (typeof window === "undefined") return;
+
+    // Get current state
+    const wasPlaying = this.isPlaying;
+    const currentCode = this.getCode();
+    const container = this.containerElement;
+
+    if (!container) return;
+
+    // Stop playback
+    if (wasPlaying) {
+      this.stop();
     }
-    styleEl.innerHTML = `:root .cm-editor {
-      ${Object.entries(themeSettings)
-        // important to override fallback
-        .map(([key, value]) => `--${key}: ${value};`)
-        .join("\n")}
-    }`;
-    setTheme(themeSettings);
+
+    // Detach and reattach the editor
+    // Note: The keybindings need to be loaded dynamically
+    // For now, we'll store the preference and it will be applied on next page load
+    // A full implementation would require modifying the attach() method to accept keybindings
+
+    // Detach current editor
+    this.detach();
+
+    // Reattach with preserved code
+    this._state = { ...this._state, code: currentCode };
+    try {
+      await this.attach(container);
+
+      // Restart playback if it was playing
+      if (wasPlaying) {
+        await this.play();
+      }
+    } catch (error) {
+      console.error(
+        "Failed to reattach editor after keybindings change:",
+        error,
+      );
+      throw error;
+    }
   }
 
   prebake = async (): Promise<void> => {
@@ -630,8 +650,6 @@ export class StrudelService {
           this.setCode(savedCode);
         }
       }
-
-      this.fixTheme();
     } finally {
       this.isInitializing = false;
     }

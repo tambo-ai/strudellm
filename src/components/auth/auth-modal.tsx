@@ -59,7 +59,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
         {sent ? (
           <>
             <div className="flex items-center justify-center mb-4">
-              <CheckCircle className="w-12 h-12 text-green-500" />
+              <CheckCircle className="w-12 h-12 text-success" />
             </div>
             <h2 className="text-xl font-semibold mb-2 text-center">
               Check your email
