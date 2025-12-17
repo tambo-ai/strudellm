@@ -67,7 +67,6 @@ const MAX_EXPORT_CYCLES = 64;
 
 export class StrudelService {
   private static _instance: StrudelService | null = null;
-  private static isDefaultAudioContextSwapInProgress = false;
 
   // Audio engine state
   private isAudioInitialized = false;
@@ -121,7 +120,9 @@ export class StrudelService {
   }
 
   private static coerceNumber(value: unknown): number | null {
-    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return Math.abs(value) <= MAX_EXPORT_CYCLES * 8 ? value : null;
+    }
     if (
       value &&
       typeof value === "object" &&
@@ -129,7 +130,8 @@ export class StrudelService {
       typeof (value as { valueOf: () => unknown }).valueOf === "function"
     ) {
       const coerced = Number((value as { valueOf: () => unknown }).valueOf());
-      return Number.isFinite(coerced) ? coerced : null;
+      if (!Number.isFinite(coerced)) return null;
+      return Math.abs(coerced) <= MAX_EXPORT_CYCLES * 8 ? coerced : null;
     }
     return null;
   }
@@ -139,12 +141,6 @@ export class StrudelService {
     ctx: BaseAudioContext,
     fn: () => Promise<T>,
   ): Promise<T> {
-    if (StrudelService.isDefaultAudioContextSwapInProgress) {
-      throw new Error("Export already in progress");
-    }
-
-    StrudelService.isDefaultAudioContextSwapInProgress = true;
-
     const restoreTo = getAudioContext();
 
     // Note: this mutates global Strudel/Superdough state and should only be used
@@ -154,7 +150,6 @@ export class StrudelService {
       return await fn();
     } finally {
       setDefaultAudioContext(restoreTo);
-      StrudelService.isDefaultAudioContextSwapInProgress = false;
     }
   }
 

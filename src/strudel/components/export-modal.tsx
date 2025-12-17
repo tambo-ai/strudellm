@@ -8,6 +8,45 @@ interface ExportModalProps {
   onClose: () => void;
 }
 
+function useDialogKeyHandling(
+  containerRef: React.RefObject<HTMLElement | null>,
+  onEscape: () => void,
+) {
+  React.useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onEscape();
+        return;
+      }
+
+      if (e.key !== "Tab") return;
+
+      const focusable = container.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusable || focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+
+      if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    container.addEventListener("keydown", handleKeyDown);
+    return () => container.removeEventListener("keydown", handleKeyDown);
+  }, [containerRef, onEscape]);
+}
+
 export function ExportModal({ onClose }: ExportModalProps) {
   const dialogRef = React.useRef<HTMLDivElement | null>(null);
   const [cycles, setCycles] = React.useState<number>(8);
@@ -19,6 +58,8 @@ export function ExportModal({ onClose }: ExportModalProps) {
     if (isExporting) return;
     onClose();
   }, [isExporting, onClose]);
+
+  useDialogKeyHandling(dialogRef, handleClose);
 
   React.useEffect(() => {
     const previousActive = document.activeElement as HTMLElement | null;
@@ -33,6 +74,7 @@ export function ExportModal({ onClose }: ExportModalProps) {
 
     setIsExporting(true);
     setError(null);
+    let url: string | null = null;
     try {
       let blob: Blob;
       switch (format) {
@@ -46,18 +88,20 @@ export function ExportModal({ onClose }: ExportModalProps) {
       }
       const filename = `strudel-${cycles}cycles.${format}`;
 
-      const url = URL.createObjectURL(blob);
+      url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      URL.revokeObjectURL(url);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setError(message);
     } finally {
+      if (url) {
+        URL.revokeObjectURL(url);
+      }
       setIsExporting(false);
     }
   }, [cycles, format, isExporting]);
@@ -77,31 +121,6 @@ export function ExportModal({ onClose }: ExportModalProps) {
         aria-modal="true"
         aria-label="Export current Strudel song"
         tabIndex={-1}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") {
-            handleClose();
-            return;
-          }
-
-          if (e.key === "Tab") {
-            const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
-              'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-            );
-            if (!focusable || focusable.length === 0) return;
-
-            const first = focusable[0];
-            const last = focusable[focusable.length - 1];
-            const active = document.activeElement;
-
-            if (e.shiftKey && active === first) {
-              e.preventDefault();
-              last.focus();
-            } else if (!e.shiftKey && active === last) {
-              e.preventDefault();
-              first.focus();
-            }
-          }
-        }}
         className="relative bg-background border border-border rounded-xl shadow-lg max-w-md w-full mx-4 p-6"
       >
         <button

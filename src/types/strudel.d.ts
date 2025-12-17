@@ -192,7 +192,7 @@ declare module "@strudel/codemirror" {
     evaluate(): Promise<void>;
     /** Current editor state */
     repl: {
-      evaluate: (code: string, autoplay: boolean) => Promise<void>;
+      evaluate: (code: string, autoplay: boolean) => Promise<unknown>;
       setCode: (b) => void;
       state: StrudelReplState;
       scheduler: {
