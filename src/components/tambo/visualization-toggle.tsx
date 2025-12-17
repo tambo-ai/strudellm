@@ -19,6 +19,8 @@ type VisualizationType = "pianoroll" | "waveform" | "spectrum";
 
 type VisualizationOrOff = VisualizationType | null;
 
+const DEFAULT_NEAREST_NON_EMPTY_LINE_DISTANCE = 32;
+
 const VISUALIZATION_OPTIONS: Array<{
   id: VisualizationType;
   label: string;
@@ -61,8 +63,21 @@ function stripTrailingVisualizationFromLine(
   return { type: lastType, strippedLine: currentLine };
 }
 
-function getDetectedVisualization(code: string): VisualizationOrOff {
+function getDetectedVisualization(
+  code: string,
+  cursorLineIndex: number | null,
+): VisualizationOrOff {
   const lines = code.split("\n");
+
+  if (cursorLineIndex !== null) {
+    const idx = Math.min(
+      Math.max(cursorLineIndex, 0),
+      Math.max(lines.length - 1, 0),
+    );
+    const { type } = stripTrailingVisualizationFromLine(lines[idx] ?? "");
+    if (type) return type;
+  }
+
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i] ?? "";
     const { type } = stripTrailingVisualizationFromLine(line);
@@ -82,12 +97,12 @@ function stripVisualizationsFromCode(code: string): string {
 function findNearestNonEmptyLineIndex(
   lines: string[],
   preferredIndex: number,
-  maxDistance?: number,
+  maxDistance: number = DEFAULT_NEAREST_NON_EMPTY_LINE_DISTANCE,
 ): number | null {
   if (preferredIndex < 0 || preferredIndex >= lines.length) return null;
   if (lines[preferredIndex]?.trim()) return preferredIndex;
 
-  const limit = maxDistance ?? lines.length;
+  const limit = Math.min(maxDistance, lines.length);
 
   for (let distance = 1; distance <= limit; distance++) {
     const above = preferredIndex - distance;
@@ -121,7 +136,12 @@ function setVisualization(
     Math.max(cursorLineIndex ?? 0, 0),
     Math.max(lines.length - 1, 0),
   );
-  const targetIndex = findNearestNonEmptyLineIndex(lines, preferredLineIndex);
+  const fallbackIndex = findNearestNonEmptyLineIndex(
+    lines,
+    Math.max(lines.length - 1, 0),
+  );
+  const targetIndex =
+    findNearestNonEmptyLineIndex(lines, preferredLineIndex) ?? fallbackIndex;
 
   if (targetIndex === null) {
     return code;
@@ -150,8 +170,8 @@ export function VisualizationToggle({
   const { code, setCode, isPlaying, getCursorLineIndex } = useStrudel();
 
   const detectedVisualization = React.useMemo(
-    () => getDetectedVisualization(code),
-    [code],
+    () => getDetectedVisualization(code, getCursorLineIndex()),
+    [code, getCursorLineIndex],
   );
 
   const [selectedVisualization, setSelectedVisualization] =

@@ -515,6 +515,9 @@ export class StrudelService {
     const cursorLocation = this.getCursorLocation();
     if (cursorLocation === null) return null;
 
+    // Assumes CodeMirror is available under `editor.state.doc.lineAt`. If this
+    // changes, cursor-based features (like visualization placement) will degrade
+    // gracefully by returning null.
     const lineAt = (this.editorInstance as unknown as CursorAwareEditorInstance)
       .editor?.state?.doc?.lineAt;
     if (typeof lineAt !== "function") return null;

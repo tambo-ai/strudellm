@@ -10,6 +10,10 @@ type StrudelContextValue = {
   code: string;
   error: string | Error | null;
   setCode: (code: string, shouldPlay?: boolean) => void;
+  /**
+   * Returns the 0-based cursor line index if available, or null when the editor
+   * is not ready or cursor information cannot be obtained.
+   */
   getCursorLineIndex: () => number | null;
   setThreadId: (threadId: string | null) => void;
   setReplId: (replId: string) => void;
