@@ -117,17 +117,123 @@ export class StrudelService {
     return StrudelService.isValidCps(value) ? value : 0.5;
   }
 
+  private static coerceNumber(value: unknown): number | null {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (
+      value &&
+      typeof value === "object" &&
+      "valueOf" in value &&
+      typeof (value as { valueOf: () => unknown }).valueOf === "function"
+    ) {
+      const coerced = Number((value as { valueOf: () => unknown }).valueOf());
+      return Number.isFinite(coerced) ? coerced : null;
+    }
+    return null;
+  }
+
+  private static getExportCps(replCps: unknown, fallbackCps: number): number {
+    const cps = StrudelService.isValidCps(replCps)
+      ? replCps
+      : StrudelService.normalizeCps(fallbackCps);
+
+    if (!StrudelService.isValidCps(cps)) {
+      throw new Error("Export failed: CPS must be greater than zero");
+    }
+
+    return cps;
+  }
+
   private static async withDefaultAudioContext<T>(
     ctx: BaseAudioContext,
     restoreTo: BaseAudioContext,
     fn: () => Promise<T>,
   ): Promise<T> {
+    // Note: this mutates global Strudel/Superdough state and should only be used
+    // while real-time audio playback is paused.
     setDefaultAudioContext(ctx);
     try {
       return await fn();
     } finally {
       setDefaultAudioContext(restoreTo);
     }
+  }
+
+  private static async evaluateExportPattern(
+    code: string,
+    fallbackCps: number,
+  ): Promise<{ pattern: unknown; cps: number }> {
+    const repl = webaudioRepl({
+      getTime: () => 0,
+      transpiler,
+    });
+
+    const pattern = await repl.evaluate(code, false);
+    if (!pattern) {
+      const error = repl.state?.evalError;
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error(typeof error === "string" ? error : "Evaluation failed");
+    }
+
+    const replCps = StrudelService.coerceNumber(repl.scheduler?.cps);
+    const cps = StrudelService.getExportCps(replCps, fallbackCps);
+    return { pattern, cps };
+  }
+
+  private static async renderPatternToOfflineAudioBuffer({
+    pattern,
+    cycles,
+    cps,
+    sampleRate,
+    restoreTo,
+  }: {
+    pattern: unknown;
+    cycles: number;
+    cps: number;
+    sampleRate: number;
+    restoreTo: BaseAudioContext;
+  }): Promise<AudioBuffer> {
+    const seconds = cycles / cps;
+    const numFrames = Math.ceil(seconds * sampleRate);
+    const offlineContext = new OfflineAudioContext(2, numFrames, sampleRate);
+
+    return await StrudelService.withDefaultAudioContext(
+      offlineContext,
+      restoreTo,
+      async () => {
+        const queryArc = (pattern as {
+          queryArc?: (begin: number, end: number, context: unknown) => unknown[];
+        }).queryArc;
+        if (typeof queryArc !== "function") {
+          throw new Error(
+            "Export failed: pattern does not support offline rendering (missing queryArc)",
+          );
+        }
+
+        const haps = queryArc(0, cycles, { _cps: cps, cyclist: "export" });
+        const offlineWebaudioOutput: WebaudioOutputFn =
+          webaudioOutput as unknown as WebaudioOutputFn;
+
+        for (const hap of haps) {
+          const hasOnsetFn = (hap as { hasOnset?: () => boolean }).hasOnset;
+          if (typeof hasOnsetFn !== "function" || !hasOnsetFn()) continue;
+
+          const wholeBegin = (hap as { whole?: { begin?: unknown } }).whole?.begin;
+          const wholeBeginValue = StrudelService.coerceNumber(wholeBegin);
+          if (wholeBeginValue === null) continue;
+
+          const durationCycles = (hap as { duration?: unknown }).duration;
+          const durationCyclesValue = StrudelService.coerceNumber(durationCycles) ?? 0;
+          const durationSeconds = durationCyclesValue / cps;
+          const targetTime = wholeBeginValue / cps;
+
+          await offlineWebaudioOutput(hap, 0, durationSeconds, cps, targetTime);
+        }
+
+        return await offlineContext.startRendering();
+      },
+    );
   }
 
   /**
@@ -1046,88 +1152,18 @@ const keybindings = getKeybindings();
 
     const activeContext = getAudioContext();
     try {
-      const coerceNumber = (value: unknown): number | null => {
-        if (typeof value === "number" && Number.isFinite(value)) return value;
-        if (
-          value &&
-          typeof value === "object" &&
-          "valueOf" in value &&
-          typeof (value as { valueOf: () => unknown }).valueOf === "function"
-        ) {
-          const coerced = Number((value as { valueOf: () => unknown }).valueOf());
-          return Number.isFinite(coerced) ? coerced : null;
-        }
-        return null;
-      };
-
-      const repl = webaudioRepl({
-        getTime: () => 0,
-        transpiler,
-      });
-
-      const pattern = await repl.evaluate(code, false);
-      if (!pattern) {
-        const error = repl.state?.evalError;
-        if (error instanceof Error) {
-          throw error;
-        }
-        throw new Error(typeof error === "string" ? error : "Evaluation failed");
-      }
-
-      const replCps = coerceNumber(repl.scheduler?.cps);
-      const cpsValue = StrudelService.isValidCps(replCps) ? replCps : this.cps;
-      if (!StrudelService.isValidCps(cpsValue)) {
-        throw new Error("Export failed: CPS must be greater than zero");
-      }
-
-      const seconds = cycles / Math.max(cpsValue, 1e-3);
-      const numFrames = Math.ceil(seconds * activeContext.sampleRate);
-      const offlineContext = new OfflineAudioContext(
-        2,
-        numFrames,
-        activeContext.sampleRate,
+      const { pattern, cps } = await StrudelService.evaluateExportPattern(
+        code,
+        this.cps,
       );
 
-      const renderedBuffer = await StrudelService.withDefaultAudioContext(
-        offlineContext,
-        activeContext,
-        async () => {
-          const queryArc = (pattern as {
-            queryArc?: (begin: number, end: number, context: unknown) => unknown[];
-          }).queryArc;
-          if (typeof queryArc !== "function") {
-            throw new Error(
-              "Export failed: pattern does not support offline rendering (missing queryArc)",
-            );
-          }
-
-          const haps = queryArc(0, cycles, { _cps: cpsValue, cyclist: "export" });
-          const offlineWebaudioOutput: WebaudioOutputFn =
-            webaudioOutput as unknown as WebaudioOutputFn;
-
-          for (const hap of haps) {
-            const hasOnsetFn = (hap as { hasOnset?: () => boolean }).hasOnset;
-            if (typeof hasOnsetFn !== "function" || !hasOnsetFn()) continue;
-
-            const wholeBegin = (hap as { whole?: { begin?: unknown } }).whole?.begin;
-            const wholeBeginValue = coerceNumber(wholeBegin);
-            if (wholeBeginValue === null) continue;
-
-            const durationCycles = (hap as { duration?: unknown }).duration;
-            const durationCyclesValue = coerceNumber(durationCycles) ?? 0;
-            const durationSeconds = durationCyclesValue / cpsValue;
-            const targetTime = wholeBeginValue / cpsValue;
-
-            await offlineWebaudioOutput(
-              hap,
-              0,
-              durationSeconds,
-              cpsValue,
-              targetTime,
-            );
-          }
-
-          return await offlineContext.startRendering();
+      const renderedBuffer = await StrudelService.renderPatternToOfflineAudioBuffer(
+        {
+          pattern,
+          cycles,
+          cps,
+          sampleRate: activeContext.sampleRate,
+          restoreTo: activeContext,
         },
       );
 
