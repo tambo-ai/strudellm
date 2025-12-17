@@ -80,6 +80,8 @@ function getDetectedVisualization(
       idx === null ? "" : (lines[idx] ?? ""),
     );
     if (type) return type;
+
+    return null;
   }
 
   for (let i = lines.length - 1; i >= 0; i--) {
@@ -137,15 +139,10 @@ function setVisualization(
   const lines = strippedCode.split("\n");
 
   const preferredLineIndex = Math.min(
-    Math.max(cursorLineIndex ?? 0, 0),
+    Math.max(cursorLineIndex ?? lines.length - 1, 0),
     Math.max(lines.length - 1, 0),
   );
-  const fallbackIndex = findNearestNonEmptyLineIndex(
-    lines,
-    Math.max(lines.length - 1, 0),
-  );
-  const targetIndex =
-    findNearestNonEmptyLineIndex(lines, preferredLineIndex) ?? fallbackIndex;
+  const targetIndex = findNearestNonEmptyLineIndex(lines, preferredLineIndex);
 
   if (targetIndex === null) {
     return code;
