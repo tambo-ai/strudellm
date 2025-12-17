@@ -2,8 +2,9 @@ import { cn } from "@/lib/utils";
 import { useStrudel } from "@/strudel/context/strudel-provider";
 import { StrudelService } from "@/strudel/lib/service";
 import { useTamboThread, useTamboThreadInput } from "@tambo-ai/react";
-import { Play, Square, RotateCcw, BotIcon } from "lucide-react";
+import { Play, Square, RotateCcw, BotIcon, Info } from "lucide-react";
 import React from "react";
+import { InfoModal } from "@/components/info-modal";
 
 /**
  * Categorize the error type for better context
@@ -29,6 +30,7 @@ function categorizeError(error: string | Error): string {
 }
 
 export function StrudelStatusBar() {
+  const [showInfoModal, setShowInfoModal] = React.useState(false);
   const {
     isPlaying,
     isReady,
@@ -128,6 +130,11 @@ Please fix the error and update the REPL with corrected code.`;
             )}
             {isPlaying ? "stop" : "play"}
           </button>
+          {isReady && (
+            <span className="text-muted-foreground/60 text-xs">
+              {isPlaying ? "^." : "^enter"}
+            </span>
+          )}
           <span className="text-muted-foreground/50">|</span>
           <span className={isPlaying ? "text-primary" : ""}>
             {isPlaying ? "playing" : "stopped"}
@@ -142,6 +149,7 @@ Please fix the error and update the REPL with corrected code.`;
                 <Play className="w-3 h-3" />
                 update
               </button>
+              <span className="text-muted-foreground/60 text-xs">^enter</span>
             </>
           )}
           <span className="text-muted-foreground/50">|</span>
@@ -158,19 +166,21 @@ Please fix the error and update the REPL with corrected code.`;
           </button>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-muted-foreground/60">
-            {isReady ? "^enter play · ^. stop" : "loading..."}
-          </span>
-          <a
-            href="https://strudel.cc/learn/getting-started/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-muted-foreground hover:text-foreground"
+          {!isReady && (
+            <span className="text-muted-foreground/60">loading...</span>
+          )}
+          <button
+            onClick={() => setShowInfoModal(true)}
+            className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
           >
-            docs
-          </a>
+            <Info className="w-3 h-3" />
+            info
+          </button>
         </div>
       </div>
+
+      {/* Info Modal */}
+      {showInfoModal && <InfoModal onClose={() => setShowInfoModal(false)} />}
     </>
   );
 }
