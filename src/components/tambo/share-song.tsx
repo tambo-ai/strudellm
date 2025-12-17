@@ -46,6 +46,8 @@ export const ShareSong = React.forwardRef<HTMLDivElement, ShareSongProps>(
       url: null,
     });
 
+    const shareUrl = share?.url ?? null;
+
     const currentReplName = React.useMemo(() => {
       if (!currentReplId) return null;
       return storage.getRepl(currentReplId)?.name ?? null;
@@ -88,10 +90,10 @@ export const ShareSong = React.forwardRef<HTMLDivElement, ShareSongProps>(
     };
 
     const handleCopy = async () => {
-      if (!share.url) return;
+      if (!shareUrl) return;
 
       try {
-        await navigator.clipboard.writeText(share.url);
+        await navigator.clipboard.writeText(shareUrl);
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
       } catch {
@@ -156,16 +158,16 @@ export const ShareSong = React.forwardRef<HTMLDivElement, ShareSongProps>(
             ) : (
               <Link2 className="w-4 h-4" />
             )}
-            {share.url ? "Regenerate link" : "Generate link"}
+            {shareUrl ? "Regenerate link" : "Generate link"}
           </button>
         </div>
 
-        {share.url && (
+        {shareUrl && (
           <div className="space-y-2">
             <div className="text-xs text-muted-foreground">Share URL</div>
             <div className="flex gap-2">
               <input
-                value={share.url}
+                value={shareUrl}
                 readOnly
                 className="flex-1 px-3 py-2 bg-muted border border-border rounded-md text-sm text-foreground"
               />

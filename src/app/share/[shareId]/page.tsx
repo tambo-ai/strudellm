@@ -5,9 +5,9 @@ import { SharedSongClient } from "./shared-song-client";
 export default async function SharePage({
   params,
 }: {
-  params: { shareId: string };
+  params: Promise<{ shareId: string }>;
 }) {
-  const { shareId } = params;
+  const { shareId } = await params;
   const share = await getSongShare(shareId);
 
   if (!share) {
