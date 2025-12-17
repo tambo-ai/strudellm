@@ -73,33 +73,16 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
 
     const replUnsubscribe = strudelService.onStateChange((newState) => {
       setReplState((prevState) => {
-        const hasEvalError = Object.prototype.hasOwnProperty.call(
-          newState,
-          "evalError",
-        );
-        const hasSchedulerError = Object.prototype.hasOwnProperty.call(
-          newState,
-          "schedulerError",
-        );
-        const hasMissingSample = Object.prototype.hasOwnProperty.call(
-          newState,
-          "missingSample",
-        );
-
-        // Preserve existing errors if the new state omits them
-        const evalError = hasEvalError ? newState.evalError : prevState?.evalError;
-        const schedulerError = hasSchedulerError
-          ? newState.schedulerError
-          : prevState?.schedulerError;
-        const missingSample = hasMissingSample
-          ? newState.missingSample
-          : prevState?.missingSample ?? null;
+        const nextState: StrudelReplState = {
+          ...(prevState ?? {}),
+          ...newState,
+        } as StrudelReplState;
 
         // Check if a new error appeared while playing (user-caused error, not AI)
         // Only stop if: was playing, no previous error, now has error, not AI updating
         const wasPlaying = prevState?.started === true;
         const hadNoError = !prevState?.evalError && !prevState?.schedulerError;
-        const hasError = !!(evalError || schedulerError);
+        const hasError = !!(nextState.evalError || nextState.schedulerError);
         const isUserError = !isAiUpdatingRef.current;
 
         if (wasPlaying && hadNoError && hasError && isUserError) {
@@ -108,11 +91,8 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
         }
 
         return {
-          ...prevState,
-          ...newState,
-          evalError,
-          schedulerError,
-          missingSample,
+          ...nextState,
+          missingSample: nextState.missingSample ?? null,
         };
       });
     });

@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { useStrudel } from "@/strudel/context/strudel-provider";
+import { isSampleErrorMessage } from "@/strudel/lib/errors";
 import {
   useTamboContextAttachment,
   useTamboThread,
@@ -19,13 +20,7 @@ function categorizeError(error: string | Error): string {
   const lowerMsg = errorMsg.toLowerCase();
 
   // Check for sample/sound related errors (e.g., "sound supersquare not found! Is it loaded?")
-  if (/\b(?:sound|sample)\s+.+\s+not\s+found\b/i.test(errorMsg)) {
-    return "invalid_sample";
-  }
-  if (
-    /\b(?:sound|sample)\b/i.test(errorMsg) &&
-    /(not found|not loaded|is it loaded)/i.test(errorMsg)
-  ) {
+  if (isSampleErrorMessage(errorMsg)) {
     return "invalid_sample";
   }
   if (lowerMsg.includes("undefined") || lowerMsg.includes("not a pattern")) {

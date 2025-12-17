@@ -24,6 +24,7 @@ import {
   StrudelReplState,
 } from "@strudel/codemirror";
 import { getDrawContext, setTheme } from "@strudel/draw";
+import { isSampleErrorMessage as matchesSampleErrorMessage } from "@/strudel/lib/errors";
 import type {
   StrudelStorageAdapter,
   ReplSummary,
@@ -621,14 +622,7 @@ export class StrudelService {
   };
 
   private isSampleErrorMessage(message: string): boolean {
-    if (/\b(?:sound|sample)\s+.+\s+not\s+found\b/i.test(message)) {
-      return true;
-    }
-
-    return (
-      /\b(?:sound|sample)\b/i.test(message) &&
-      /(not found|not loaded|is it loaded)/i.test(message)
-    );
+    return matchesSampleErrorMessage(message);
   }
 
   private isAudioWorkletErrorMessage(message: string): boolean {
