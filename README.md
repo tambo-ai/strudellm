@@ -2,13 +2,16 @@
 
 Make music with AI. Just describe what you want to hear.
 
-Built by the [Tambo](https://tambo.co) team to show what's possible when you give an AI agent control of a live coding music engine. Powered by [Strudel](https://strudel.cc/).
+Built by the [Tambo](https://tambo.co) team to show what's possible when you give an AI agent control of a live coding music engine.
 
-**Try it**:
+## Try it
+
+Go to [StrudelLM.com](https://strudellm.com) live:
 
 ```
 make the intro to Stranger Things
 ```
+
 ## What Can You Do?
 
 
