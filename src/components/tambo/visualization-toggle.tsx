@@ -70,11 +70,15 @@ function getDetectedVisualization(
   const lines = code.split("\n");
 
   if (cursorLineIndex !== null) {
-    const idx = Math.min(
+    const preferredIndex = Math.min(
       Math.max(cursorLineIndex, 0),
       Math.max(lines.length - 1, 0),
     );
-    const { type } = stripTrailingVisualizationFromLine(lines[idx] ?? "");
+
+    const idx = findNearestNonEmptyLineIndex(lines, preferredIndex);
+    const { type } = stripTrailingVisualizationFromLine(
+      idx === null ? "" : (lines[idx] ?? ""),
+    );
     if (type) return type;
   }
 
@@ -102,7 +106,7 @@ function findNearestNonEmptyLineIndex(
   if (preferredIndex < 0 || preferredIndex >= lines.length) return null;
   if (lines[preferredIndex]?.trim()) return preferredIndex;
 
-  const limit = Math.min(maxDistance, lines.length);
+  const limit = maxDistance;
 
   for (let distance = 1; distance <= limit; distance++) {
     const above = preferredIndex - distance;
