@@ -27,7 +27,10 @@ const THEME_STORAGE_KEY = "strudel-editor-theme";
 function getThemeBootstrapScript(): string {
   return `(() => {
   try {
-    var theme = localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    if (!('localStorage' in window)) return;
+
+    var theme = window.localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});
 
     // Guard against corrupted values.
     if (theme && /^[a-z0-9-]+$/.test(theme)) {
