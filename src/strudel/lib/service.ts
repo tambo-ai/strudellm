@@ -113,7 +113,7 @@ export class StrudelService {
   // Storage adapter (can be swapped for Jazz or localStorage)
   private storageAdapter: StrudelStorageAdapter | null = null;
 
-  private exportGuardedEditors = new WeakSet<object>();
+  private exportGuardedEditors = new WeakSet<StrudelMirror>();
 
   private constructor() {}
 
