@@ -18,7 +18,9 @@ import { validateAndUpdateRepl } from "@/strudel/tools/validateAndUpdateRepl";
 import { listSamples } from "@/strudel/tools/listSamples";
 import { MultiSelectForm, multiSelectFormSchema } from "@/components/tambo/multi-select-form";
 import {
+  VisualizationToggle,
   VisualizationVisibilityToggle,
+  visualizationToggleSchema,
   visualizationVisibilityToggleSchema,
 } from "@/components/tambo/visualization-toggle";
 
@@ -41,6 +43,13 @@ export const components: TamboComponent[] = [
       "A general-purpose multi-select form component. Renders labeled groups of toggle buttons where users can select multiple options within each group. Uses Tambo state to track user selections in AI context. Use for any scenario where the user needs to pick from categorized options (sounds, features, settings, categories, tags, etc.).",
     component: MultiSelectForm,
     propsSchema: multiSelectFormSchema,
+  },
+  {
+    name: "VisualizationToggle",
+    description:
+      "Deprecated alias of VisualizationVisibilityToggle. Show/hide Strudel visualization widgets in the editor without modifying code.",
+    component: VisualizationToggle,
+    propsSchema: visualizationToggleSchema,
   },
   {
     name: "VisualizationVisibilityToggle",

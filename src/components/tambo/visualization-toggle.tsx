@@ -71,3 +71,11 @@ export function VisualizationVisibilityToggle({
     </div>
   );
 }
+
+// Deprecated aliases kept for compatibility with any existing Tambo dashboards.
+export const visualizationToggleSchema = visualizationVisibilityToggleSchema;
+export type VisualizationToggleProps = VisualizationVisibilityToggleProps;
+
+export function VisualizationToggle(props: VisualizationToggleProps) {
+  return <VisualizationVisibilityToggle {...props} />;
+}
