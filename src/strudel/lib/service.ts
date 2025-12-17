@@ -487,6 +487,7 @@ export class StrudelService {
 
     // Get current state
     const wasPlaying = this.isPlaying;
+    const stateBeforeRestart = { ...this._state };
     const currentCode = this.getCode();
     this._state = { ...this._state, code: currentCode };
 
@@ -515,6 +516,19 @@ export class StrudelService {
     } catch (error) {
       if (!didAttach) {
         this.detach();
+
+        try {
+          this._state = { ...stateBeforeRestart, code: currentCode };
+          await this.attach(container);
+          if (wasPlaying) {
+            await this.play();
+          }
+        } catch (restoreError) {
+          console.error(
+            "Failed to restore editor after restart failure:",
+            restoreError,
+          );
+        }
       }
       console.error(
         "Failed to reattach editor after keybindings change:",
