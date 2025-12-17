@@ -14,13 +14,27 @@ export function ExportModal({ onClose }: ExportModalProps) {
   const [isExporting, setIsExporting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
+  const handleClose = React.useCallback(() => {
+    if (isExporting) return;
+    onClose();
+  }, [isExporting, onClose]);
+
   const download = React.useCallback(async () => {
     if (isExporting) return;
 
     setIsExporting(true);
     setError(null);
     try {
-      const blob = await StrudelService.instance().exportWav(cycles);
+      let blob: Blob;
+      switch (format) {
+        case "wav": {
+          blob = await StrudelService.instance().exportWav(cycles);
+          break;
+        }
+        default: {
+          throw new Error(`Export format "${format}" is not supported yet`);
+        }
+      }
       const filename = `strudel-${cycles}cycles.${format}`;
 
       const url = URL.createObjectURL(blob);
@@ -44,15 +58,13 @@ export function ExportModal({ onClose }: ExportModalProps) {
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={() => {
-          if (!isExporting) onClose();
-        }}
+        onClick={handleClose}
       />
 
       {/* Modal */}
       <div className="relative bg-background border border-border rounded-xl shadow-lg max-w-md w-full mx-4 p-6">
         <button
-          onClick={onClose}
+          onClick={handleClose}
           disabled={isExporting}
           className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30"
         >
@@ -106,7 +118,7 @@ export function ExportModal({ onClose }: ExportModalProps) {
 
         <div className="mt-6 flex items-center justify-end gap-2">
           <button
-            onClick={onClose}
+            onClick={handleClose}
             disabled={isExporting}
             className="px-4 py-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors text-sm disabled:opacity-30"
           >

@@ -39,6 +39,14 @@ type CodeChangeCallback = (state: StrudelReplState) => void;
 
 type UpdateSource = "ai" | "user";
 
+type WebaudioOutputFn = (
+  hap: unknown,
+  deadline: number,
+  duration: number,
+  cps: number,
+  targetTime: number,
+) => void | Promise<void>;
+
 const DEFAULT_CODE = `// Welcome to StrudelLM!
 // Write patterns here or ask the AI for help
 
@@ -100,6 +108,10 @@ export class StrudelService {
   private storageAdapter: StrudelStorageAdapter | null = null;
 
   private constructor() {}
+
+  private static normalizeCps(value: unknown): number {
+    return typeof value === "number" && Number.isFinite(value) ? value : 0.5;
+  }
 
   /**
    * Get or create the singleton instance
@@ -188,7 +200,7 @@ export class StrudelService {
   get cps(): number {
     const value = (this.editorInstance?.repl.scheduler as { cps?: number } | null)
       ?.cps;
-    return typeof value === "number" && Number.isFinite(value) ? value : 0.5;
+    return StrudelService.normalizeCps(value);
   }
 
   // ============================================
@@ -1031,10 +1043,7 @@ const keybindings = getKeybindings();
         throw new Error(typeof error === "string" ? error : "Evaluation failed");
       }
 
-      const cpsValue =
-        typeof repl.scheduler?.cps === "number" && Number.isFinite(repl.scheduler.cps)
-          ? repl.scheduler.cps
-          : 0.5;
+      const cpsValue = StrudelService.normalizeCps(repl.scheduler?.cps);
 
       const seconds = cycles / Math.max(cpsValue, 1e-3);
       const numFrames = Math.ceil(seconds * activeContext.sampleRate);
@@ -1050,6 +1059,9 @@ const keybindings = getKeybindings();
         queryArc: (begin: number, end: number, context: unknown) => unknown[];
       }).queryArc(0, cycles, { _cps: cpsValue, cyclist: "export" });
 
+      const offlineWebaudioOutput: WebaudioOutputFn =
+        webaudioOutput as unknown as WebaudioOutputFn;
+
       for (const hap of haps) {
         const hasOnset = (hap as { hasOnset?: () => boolean }).hasOnset?.();
         if (!hasOnset) continue;
@@ -1062,13 +1074,7 @@ const keybindings = getKeybindings();
           typeof durationCycles === "number" ? durationCycles / cpsValue : 0;
         const targetTime = wholeBegin / cpsValue;
 
-        (webaudioOutput as unknown as (
-          hap: unknown,
-          deadline: number,
-          duration: number,
-          cps: number,
-          targetTime: number,
-        ) => unknown)(hap, 0, durationSeconds, cpsValue, targetTime);
+        await offlineWebaudioOutput(hap, 0, durationSeconds, cpsValue, targetTime);
       }
 
       const renderedBuffer = await offlineContext.startRendering();

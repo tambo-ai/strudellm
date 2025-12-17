@@ -52,7 +52,10 @@ export function audioBufferToWavBlob(audioBuffer: AudioBuffer): Blob {
   for (let i = 0; i < numFrames; i++) {
     for (let ch = 0; ch < numChannels; ch++) {
       const sample = Math.max(-1, Math.min(1, channels[ch][i] ?? 0));
-      const int16 = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+      const int16 =
+        sample < 0
+          ? Math.round(sample * 0x8000)
+          : Math.round(sample * 0x7fff);
       view.setInt16(offset, int16, true);
       offset += 2;
     }
