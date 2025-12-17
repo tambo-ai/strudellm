@@ -192,7 +192,7 @@ export function StrudelStatusBar() {
       <div className="px-3 py-1.5 border-t border-border text-muted-foreground flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
-            onClick={isPlaying ? stop : play}
+            onClick={isPlaying ? stop : handlePlay}
             disabled={!isReady}
             className={cn(
               "flex items-center gap-1.5 disabled:opacity-30",
@@ -223,7 +223,7 @@ export function StrudelStatusBar() {
             <>
               <span className="text-muted-foreground/50">|</span>
               <button
-                onClick={play}
+                onClick={handlePlay}
                 className="flex items-center gap-1.5 text-amber-500 hover:text-amber-400 animate-pulse"
               >
                 <Play className="w-3 h-3" />

@@ -16,18 +16,38 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
   const [format, setFormat] = React.useState<"wav">("wav");
   const [isExporting, setIsExporting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const isExportingRef = React.useRef(false);
+  const isMountedRef = React.useRef(true);
 
-  const handleClose = React.useCallback(() => {
-    if (isExporting) return;
-    onOpenChange(false);
-  }, [isExporting, onOpenChange]);
+  React.useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const setExporting = (value: boolean) => {
+    isExportingRef.current = value;
+    if (isMountedRef.current) {
+      setIsExporting(value);
+    }
+  };
+
+  const handleOpenChange = React.useCallback(
+    (nextOpen: boolean) => {
+      if (!nextOpen && isExportingRef.current) return;
+      onOpenChange(nextOpen);
+    },
+    [onOpenChange],
+  );
 
   const download = React.useCallback(async () => {
-    if (isExporting) return;
+    if (isExportingRef.current) return;
 
-    setIsExporting(true);
-    setError(null);
-    let url: string | null = null;
+    setExporting(true);
+    if (isMountedRef.current) {
+      setError(null);
+    }
+
     try {
       let blob: Blob;
       switch (format) {
@@ -39,35 +59,32 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
           throw new Error(`Export format "${format}" is not supported yet`);
         }
       }
-      const filename = `strudel-${cycles}cycles.${format}`;
 
-      url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      const filename = `strudel-${cycles}cycles.${format}`;
+      const url = URL.createObjectURL(blob);
+      try {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } finally {
+        // Allow the click/navigation to process before releasing the blob URL.
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      setError(message);
-    } finally {
-      if (url) {
-        const urlToRevoke = url;
-        setTimeout(() => URL.revokeObjectURL(urlToRevoke), 0);
+      if (isMountedRef.current) {
+        setError(message);
       }
-      setIsExporting(false);
+    } finally {
+      setExporting(false);
     }
-  }, [cycles, format, isExporting]);
+  }, [cycles, format]);
 
   return (
-    <Dialog.Root
-      open={open}
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen && isExporting) return;
-        onOpenChange(nextOpen);
-      }}
-    >
+    <Dialog.Root open={open} onOpenChange={handleOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay
           className={cn(
@@ -78,14 +95,18 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
         />
         <Dialog.Content
           onEscapeKeyDown={(e) => {
-            if (isExporting) e.preventDefault();
+            if (isExportingRef.current) {
+              e.preventDefault();
+            }
           }}
           onPointerDownOutside={(e) => {
-            if (isExporting) e.preventDefault();
+            if (isExportingRef.current) {
+              e.preventDefault();
+            }
           }}
           className={cn(
             "fixed left-[50%] top-[50%] z-50 w-full max-w-md translate-x-[-50%] translate-y-[-50%]",
-            "mx-4 rounded-xl border border-border bg-background p-6 shadow-lg",
+            "rounded-xl border border-border bg-background p-6 shadow-lg",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
             "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
@@ -100,14 +121,15 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
             Export current Strudel song
           </Dialog.Description>
 
-          <button
-            onClick={handleClose}
-            disabled={isExporting}
-            className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30"
-            aria-label="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <Dialog.Close asChild>
+            <button
+              disabled={isExporting}
+              className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </Dialog.Close>
 
           <div className="space-y-4">
             <div>
@@ -158,13 +180,14 @@ export function ExportModal({ open, onOpenChange }: ExportModalProps) {
                 Rendering in progress. Closing is disabled.
               </span>
             )}
-            <button
-              onClick={handleClose}
-              disabled={isExporting}
-              className="px-4 py-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors text-sm disabled:opacity-30"
-            >
-              Cancel
-            </button>
+            <Dialog.Close asChild>
+              <button
+                disabled={isExporting}
+                className="px-4 py-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors text-sm disabled:opacity-30"
+              >
+                Cancel
+              </button>
+            </Dialog.Close>
             <button
               onClick={download}
               disabled={isExporting}

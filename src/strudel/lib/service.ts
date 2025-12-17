@@ -113,6 +113,12 @@ export class StrudelService {
 
   private constructor() {}
 
+  private ensureNotExporting(action: string): void {
+    if (this.isExporting) {
+      throw new Error(`${action} is disabled during export`);
+    }
+  }
+
   private static isValidCps(value: unknown): value is number {
     return typeof value === "number" && Number.isFinite(value) && value > 0;
   }
@@ -1096,7 +1102,7 @@ const keybindings = getKeybindings();
 
   play = async (): Promise<void> => {
     if (this.isExporting) {
-      return;
+      throw new Error("Cannot start playback during export");
     }
     this.registerGlobalErrorHandlers();
     this.installConsoleErrorFilter();
@@ -1128,6 +1134,7 @@ const keybindings = getKeybindings();
   stop = (): void => {
     if (this.isExporting) {
       this.restartPlaybackAfterExport = false;
+      return;
     }
     this.editorInstance?.repl.stop();
     this.pendingSchedulerWaitCancel?.();
@@ -1194,12 +1201,17 @@ const keybindings = getKeybindings();
       this.restartPlaybackAfterExport = false;
 
       if (shouldRestart) {
-        await this.play();
+        try {
+          await this.play();
+        } catch {
+          // Ignore restart failures to avoid masking a successful export.
+        }
       }
     }
   };
 
   evaluate = async (code: string, play: boolean = false): Promise<void> => {
+    this.ensureNotExporting("Evaluation");
     const result = await this.editorInstance?.repl.evaluate(code, play);
     if (!result) {
       throw new Error(
@@ -1303,6 +1315,8 @@ const keybindings = getKeybindings();
     const wasPlaying = this.isPlaying;
 
     try {
+      this.ensureNotExporting("Playback");
+
       // Stop playback first to avoid partial broken state
       if (wasPlaying) {
         this.stop();
@@ -1462,6 +1476,10 @@ const keybindings = getKeybindings();
    * Reset the editor to default code and stop playback
    */
   reset = (): void => {
+    if (this.isExporting) {
+      this.restartPlaybackAfterExport = false;
+      return;
+    }
     this.stop();
     this.clearError();
     this.setCode(DEFAULT_CODE);

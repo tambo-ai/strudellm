@@ -25,7 +25,7 @@ type StrudelContextValue = {
   deleteRepl: (replId: string) => void;
   isPlaying: boolean;
   hasUnevaluatedChanges: boolean;
-  play: () => void;
+  play: () => Promise<void>;
   stop: () => void;
   reset: () => void;
   clearError: () => void;
@@ -120,8 +120,8 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
     (code: string, shouldPlay: boolean = false) => {
       strudelService.setCode(code);
       if (shouldPlay) {
-        strudelService.play().catch((error) => {
-          console.warn("[StrudelProvider] Play error caught:", error);
+        void strudelService.play().catch((err) => {
+          console.error("Failed to start playback:", err);
         });
       }
     },
