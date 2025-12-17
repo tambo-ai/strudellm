@@ -152,7 +152,7 @@ export class StrudelService {
     fn: () => Promise<T>,
   ): Promise<T> {
     if (StrudelService.isDefaultAudioContextSwapInProgress) {
-      throw new Error("Audio context swapping is not reentrant");
+      throw new Error("Export already in progress");
     }
 
     StrudelService.isDefaultAudioContextSwapInProgress = true;
