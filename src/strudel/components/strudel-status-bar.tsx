@@ -80,13 +80,16 @@ export function StrudelStatusBar() {
         : "unknown";
 
     const attachmentKey = JSON.stringify({ missingSample, errorMessage, code });
-    const existing = attachments.find(
+    const existingErrors = attachments.filter(
       (a) => a.metadata?.kind === "strudel_error",
     );
+    const alreadyAttached = existingErrors.some(
+      (a) => a.metadata?.attachmentKey === attachmentKey,
+    );
 
-    if (!existing || existing.metadata?.attachmentKey !== attachmentKey) {
-      if (existing) {
-        removeContextAttachment(existing.id);
+    if (!alreadyAttached) {
+      for (const a of existingErrors) {
+        removeContextAttachment(a.id);
       }
 
       addContextAttachment({
