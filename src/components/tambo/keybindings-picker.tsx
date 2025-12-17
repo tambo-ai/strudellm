@@ -44,28 +44,33 @@ export const KeybindingsPicker = React.forwardRef<
     string | null
   >(null);
 
-  // Initialize the saved preference on mount and treat any AI prop as a
-  // pending selection the user can choose to save.
+  // Initialize from localStorage and apply the AI prop (if provided).
   React.useEffect(() => {
     if (initializedRef.current) return;
     initializedRef.current = true;
 
     const savedKeybindings = getKeybindings();
-    setSelectedKeybindings(savedKeybindings || DEFAULT_KEYBINDINGS);
+    const initialKeybindings = savedKeybindings || DEFAULT_KEYBINDINGS;
 
-    if (
-      keybindings &&
-      keybindings !== (savedKeybindings || DEFAULT_KEYBINDINGS)
-    ) {
-      setPendingKeybindings(keybindings);
+    if (keybindings) {
+      if (keybindings !== initialKeybindings) {
+        setEditorKeybindings(keybindings);
+      }
+      setSelectedKeybindings(keybindings);
+      setPendingKeybindings(null);
+      return;
     }
+
+    setSelectedKeybindings(initialKeybindings);
   }, [keybindings]);
 
   // Handle AI prop changes after initial mount
   React.useEffect(() => {
     if (!initializedRef.current) return;
     if (keybindings && keybindings !== selectedKeybindings) {
-      setPendingKeybindings(keybindings);
+      setEditorKeybindings(keybindings);
+      setSelectedKeybindings(keybindings);
+      setPendingKeybindings(null);
     }
   }, [keybindings, selectedKeybindings]);
 
