@@ -108,7 +108,7 @@ export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
       if (!isSubmitted) return null;
 
       const params = new URLSearchParams();
-      params.set("title", draftTitle.trim());
+      params.set("title", (draftTitle ?? "").trim());
       if (effectiveIssueType !== "other") {
         params.set(
           "labels",
@@ -118,7 +118,7 @@ export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
       params.set(
         "body",
         buildGithubIssueBody({
-          body: draftBody,
+          body: draftBody ?? "",
           issueType: effectiveIssueType,
           userEmail,
         }),
@@ -142,8 +142,8 @@ export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
             "content-type": "application/json",
           },
           body: JSON.stringify({
-            title: draftTitle,
-            body: draftBody,
+            title: draftTitle ?? "",
+            body: draftBody ?? "",
             issueType: effectiveIssueType,
             userEmail,
           }),
@@ -197,7 +197,7 @@ export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
               Title
             </label>
             <input
-              value={draftTitle}
+              value={draftTitle ?? ""}
               disabled={isDisabled}
               onChange={(e) => {
                 setHasEdited(true);
@@ -220,7 +220,7 @@ export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
               Details
             </label>
             <textarea
-              value={draftBody}
+              value={draftBody ?? ""}
               disabled={isDisabled}
               onChange={(e) => {
                 setHasEdited(true);
@@ -247,8 +247,8 @@ export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
               type="submit"
               disabled={
                 isDisabled ||
-                !draftTitle.trim() ||
-                !draftBody.trim() ||
+                !(draftTitle ?? "").trim() ||
+                !(draftBody ?? "").trim() ||
                 streamStatus.isStreaming
               }
               className={cn(
