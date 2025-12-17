@@ -10,13 +10,20 @@ import { PropsWithChildren } from "react";
 // In production, require a real Jazz API key from https://jazz.tools
 const JAZZ_API_KEY = process.env.NEXT_PUBLIC_JAZZ_API_KEY;
 
-if (!JAZZ_API_KEY) {
+// Only throw at runtime in the browser, not during build
+if (typeof window !== "undefined" && !JAZZ_API_KEY) {
   throw new Error(
     "NEXT_PUBLIC_JAZZ_API_KEY is required. Get one at https://jazz.tools",
   );
 }
 
 export function JazzAndAuthProvider({ children }: PropsWithChildren) {
+  // During build without env vars, render children without Jazz
+  // This allows static generation to complete
+  if (!JAZZ_API_KEY) {
+    return <>{children}</>;
+  }
+
   return (
     <JazzReactProvider
       sync={{
