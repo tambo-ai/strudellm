@@ -1,323 +1,232 @@
-"use client";
+import type { Metadata } from "next";
+import Link from "next/link";
 
-import {
-  MessageInput,
-  MessageInputError,
-  MessageInputNewThreadButton,
-  MessageInputSubmitButton,
-  MessageInputTextarea,
-  MessageInputToolbar,
-} from "@/components/tambo/message-input";
-import {
-  MessageSuggestions,
-  MessageSuggestionsList,
-} from "@/components/tambo/message-suggestions";
-import { ScrollableMessageContainer } from "@/components/tambo/scrollable-message-container";
-import {
-  ThreadContent,
-  ThreadContentMessages,
-} from "@/components/tambo/thread-content";
-import {
-  ThreadHistory,
-  ThreadHistoryHeader,
-  ThreadHistoryNewButton,
-  ThreadHistorySearch,
-  ThreadHistoryList,
-} from "@/components/tambo/thread-history";
-import { StrudelRepl } from "@/strudel/components/strudel-repl";
-import { LoadingScreen } from "@/components/loading/loading-screen";
-import { ApiKeyMissing } from "@/components/api-key-missing";
-
-import { StrudelStorageSync } from "@/components/strudel-storage-sync";
-import { components, tools } from "@/lib/tambo";
-import { LoadingContextProvider } from "@/components/loading/context";
-import { JazzAndAuthProvider } from "@/lib/providers";
-import type { Suggestion } from "@tambo-ai/react";
-import {
-  TamboProvider,
-  useTamboThread,
-  useTamboThreadList,
-  useTambo,
-} from "@tambo-ai/react";
-import { useIsAuthenticated } from "jazz-tools/react";
-import * as React from "react";
-import { Frame } from "@/components/layout/frame";
-import { Main } from "@/components/layout/main";
-import { Sidebar, SidebarContent } from "@/components/layout/sidebar";
-import { useLoadingContext as useLoadingState } from "@/components/loading/context";
-import {
-  StrudelProvider,
-  useStrudel,
-} from "@/strudel/context/strudel-provider";
-import { StrudelStatusBar } from "@/strudel/components/strudel-status-bar";
-import { StrudelService } from "@/strudel/lib/service";
-import { useStrudelStorage } from "@/hooks/use-strudel-storage";
-import { BetaModal } from "@/components/beta-modal";
-
-const BETA_MODAL_SHOWN_KEY = "strudel-beta-modal-shown-v1";
-
-/**
- * Context helper that provides the current Strudel REPL state to the AI.
- * This allows the AI to see what code is currently in the editor.
- */
-const strudelContextHelper = () => {
-  const service = StrudelService.instance();
-  const state = service.getReplState();
-
-  return {
-    currentCode: state?.code ?? "",
-    isPlaying: state?.started ?? false,
-  };
+export const metadata: Metadata = {
+  title: "StrudelLM - AI-Powered Live Coding Music",
+  description:
+    "Create music with AI assistance using Strudel, the live coding environment. Generate beats, melodies, and soundscapes through natural language.",
+  keywords: [
+    "strudel",
+    "live coding",
+    "music",
+    "AI",
+    "generative music",
+    "algorithmic music",
+    "tidal cycles",
+  ],
+  openGraph: {
+    title: "StrudelLM - AI-Powered Live Coding Music",
+    description:
+      "Create music with AI assistance using Strudel, the live coding environment.",
+    type: "website",
+    url: "https://strudel.tambo.co",
+    siteName: "StrudelLM",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "StrudelLM - AI-Powered Live Coding Music",
+    description:
+      "Create music with AI assistance using Strudel, the live coding environment.",
+  },
 };
 
-// Storage key for anonymous context
-const CONTEXT_KEY_STORAGE = "strudel-ai-context-key";
-
-// Get or create anonymous context key (for users not logged in)
-const getOrCreateAnonymousContextKey = (): string => {
-  if (typeof window === "undefined") return "";
-
-  let contextKey = localStorage.getItem(CONTEXT_KEY_STORAGE);
-  if (!contextKey) {
-    contextKey = `strudel-ai-anon-${crypto.randomUUID()}`;
-    localStorage.setItem(CONTEXT_KEY_STORAGE, contextKey);
-  }
-  return contextKey;
-};
-
-// Hook to get context key (user ID if logged in, anonymous otherwise)
-function useContextKey(): string {
-  const { isAuthenticated, isLoaded } = useStrudelStorage();
-  const [anonymousKey] = React.useState(getOrCreateAnonymousContextKey);
-
-  // If user is logged in, use a persistent key stored in localStorage
-  // This ensures the same user gets the same context key across sessions
-  if (isAuthenticated && isLoaded) {
-    // For authenticated users, we use a separate persistent key
-    // that gets created once and stored (similar to anonymous key)
-    const AUTH_CONTEXT_KEY_STORAGE = "strudel-ai-auth-context-key";
-    let authKey = localStorage.getItem(AUTH_CONTEXT_KEY_STORAGE);
-    if (!authKey) {
-      authKey = `strudel-user-${crypto.randomUUID()}`;
-      localStorage.setItem(AUTH_CONTEXT_KEY_STORAGE, authKey);
-    }
-    return authKey;
-  }
-
-  // Otherwise use anonymous key
-  return anonymousKey;
-}
-
-const strudelSuggestions: Suggestion[] = [
-  {
-    id: "suggestion-1",
-    title: "Simple beat",
-    detailedSuggestion: "Create a simple drum beat with kick and snare",
-    messageId: "simple-beat",
-  },
-  {
-    id: "suggestion-2",
-    title: "Melody",
-    detailedSuggestion: "Generate a melodic pattern using notes and chords",
-    messageId: "melody",
-  },
-  {
-    id: "suggestion-3",
-    title: "Ambient",
-    detailedSuggestion: "Create an ambient atmospheric soundscape",
-    messageId: "ambient",
-  },
-];
-
-function AppContent() {
-  const [threadInitialized, setThreadInitialized] = React.useState(false);
-  const [replInitialized, setReplInitialized] = React.useState(false);
-  const [showBetaModal, setShowBetaModal] = React.useState(false);
-  const contextKey = useContextKey();
-  const { isPending } = useLoadingState();
-  const isAuthenticated = useIsAuthenticated();
-  const {
-    isReady: strudelIsReady,
-    setThreadId,
-    currentReplId,
-    setReplId,
-    initializeRepl,
-    setIsAiUpdating,
-  } = useStrudel();
-  // Use storage hook directly for reactive isLoaded and isAuthenticated state
-  const {
-    isLoaded: isStorageLoaded,
-    attachThreadToRepl,
-    getThreadReplId,
-    isReplArchived,
-    unarchiveRepl,
-  } = useStrudelStorage();
-  const { thread, startNewThread, switchCurrentThread, isIdle } =
-    useTamboThread();
-  const { generationStage } = useTambo();
-  const { data: threadList, isSuccess: threadListLoaded } = useTamboThreadList({
-    contextKey,
-  });
-
-  // Track AI generation state to lock editor during updates
-  React.useEffect(() => {
-    // Show overlay when AI is actively working (not idle and in a generation stage)
-    const isGenerating =
-      !isIdle && generationStage !== "IDLE" && generationStage !== "COMPLETE";
-    setIsAiUpdating(isGenerating);
-  }, [isIdle, generationStage, setIsAiUpdating]);
-
-  // Show beta modal on first login
-  React.useEffect(() => {
-    if (isAuthenticated && !localStorage.getItem(BETA_MODAL_SHOWN_KEY)) {
-      setShowBetaModal(true);
-      localStorage.setItem(BETA_MODAL_SHOWN_KEY, "true");
-    }
-  }, [isAuthenticated]);
-
-  // Initialize REPL on startup - wait for storage to be loaded (Jazz synced)
-  React.useEffect(() => {
-    if (!strudelIsReady || !isStorageLoaded || replInitialized) return;
-    initializeRepl();
-    setReplInitialized(true);
-  }, [strudelIsReady, isStorageLoaded, replInitialized, initializeRepl]);
-
-  // Initialize: select most recent thread or create new
-  React.useEffect(() => {
-    if (!strudelIsReady || !threadListLoaded || threadInitialized) return;
-
-    const existingThreads = threadList?.items ?? [];
-    if (existingThreads.length > 0) {
-      switchCurrentThread(existingThreads[0].id, true);
-    } else {
-      startNewThread();
-    }
-    setThreadInitialized(true);
-  }, [
-    strudelIsReady,
-    threadListLoaded,
-    threadInitialized,
-    threadList,
-    switchCurrentThread,
-    startNewThread,
-  ]);
-
-  // Sync thread ID to Strudel service
-  React.useEffect(() => {
-    if (thread) {
-      setThreadId(thread.id);
-    }
-  }, [thread, setThreadId]);
-
-  // Attach thread to current REPL only if thread doesn't already have a REPL association
-  // This prevents overwriting existing associations when switching tabs
-  React.useEffect(() => {
-    if (thread && currentReplId) {
-      const existingReplId = getThreadReplId(thread.id);
-      if (!existingReplId) {
-        // Thread is new/unassociated - attach it to the current REPL
-        attachThreadToRepl(thread.id, currentReplId);
-      }
-    }
-  }, [thread, currentReplId, getThreadReplId, attachThreadToRepl]);
-
-  // Unarchive REPL when switching to a thread that's associated with an archived REPL
-  // This brings the REPL back into the tabs when opening its associated chat
-  React.useEffect(() => {
-    if (thread) {
-      const replId = getThreadReplId(thread.id);
-      if (replId && isReplArchived(replId)) {
-        unarchiveRepl(replId);
-        // Also switch to that REPL
-        setReplId(replId);
-      }
-    }
-  }, [thread, getThreadReplId, isReplArchived, unarchiveRepl, setReplId]);
-
-  if (isPending || !strudelIsReady || !thread) {
-    return <LoadingScreen />;
-  }
-
+export default function LandingPage() {
   return (
-    <Frame>
-      <Sidebar>
-        <Main>
-          <StrudelRepl />
-          <StrudelStatusBar />
-        </Main>
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
+      {/* Hero Section */}
+      <main className="flex-1 flex flex-col items-center justify-center px-6 py-16 relative overflow-hidden">
+        {/* Animated background elements */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="landing-glow landing-glow-1" aria-hidden="true" />
+          <div className="landing-glow landing-glow-2" aria-hidden="true" />
+          <div className="landing-glow landing-glow-3" aria-hidden="true" />
+        </div>
 
-        <SidebarContent>
-          {/* Messages */}
-          <ScrollableMessageContainer className="flex-1 p-3">
-            <ThreadContent>
-              <ThreadContentMessages />
-            </ThreadContent>
-          </ScrollableMessageContainer>
+        {/* Content */}
+        <div className="relative z-10 max-w-4xl mx-auto text-center">
+          {/* Logo/Title */}
+          <h1 className="text-5xl md:text-7xl font-bold mb-6 tracking-tight">
+            <span className="text-primary">Strudel</span>
+            <span className="text-foreground">LM</span>
+          </h1>
 
-          {/* Suggestions */}
-          <MessageSuggestions initialSuggestions={strudelSuggestions}>
-            <div className="px-3 pb-2">
-              <MessageSuggestionsList />
-            </div>
-          </MessageSuggestions>
+          {/* Tagline */}
+          <p className="text-xl md:text-2xl text-muted-foreground mb-4 max-w-2xl mx-auto">
+            Live coding music with AI assistance
+          </p>
 
-          {/* Input */}
-          <div className="p-3 border-t border-border">
-            <MessageInput contextKey={contextKey}>
-              <MessageInputTextarea placeholder=">" />
-              <MessageInputToolbar>
-                <MessageInputNewThreadButton />
-                <MessageInputSubmitButton />
-              </MessageInputToolbar>
-              <MessageInputError />
-            </MessageInput>
+          {/* Description */}
+          <p className="text-base md:text-lg text-muted-foreground/80 mb-12 max-w-xl mx-auto leading-relaxed">
+            Generate beats, melodies, and soundscapes through natural language.
+            Powered by Strudel and AI.
+          </p>
+
+          {/* CTA Button */}
+          <Link
+            href="/chat"
+            className="inline-flex items-center gap-2 px-8 py-4 bg-primary text-primary-foreground font-medium rounded-xl text-lg transition-all duration-200 hover:opacity-90 hover:scale-[1.02] active:scale-[0.98]"
+          >
+            Start Creating
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M13 7l5 5m0 0l-5 5m5-5H6"
+              />
+            </svg>
+          </Link>
+        </div>
+      </main>
+
+      {/* Video Section - uncomment when video asset is ready
+      <section className="px-6 py-16 bg-card/50">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-2xl md:text-3xl font-semibold text-center mb-8">
+            See it in action
+          </h2>
+
+          <div className="relative aspect-video bg-muted rounded-xl overflow-hidden border border-border">
+            <video
+              className="w-full h-full object-cover"
+              controls
+              playsInline
+              preload="metadata"
+            >
+              <source
+                src="https://github.com/user-attachments/assets/YOUR_VIDEO.mp4"
+                type="video/mp4"
+              />
+              <p className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+                Your browser does not support the video tag.
+              </p>
+            </video>
           </div>
-        </SidebarContent>
-      </Sidebar>
+        </div>
+      </section>
+      */}
 
-      {/* Thread History Sidebar */}
-      <ThreadHistory
-        contextKey={contextKey}
-        position="right"
-        defaultCollapsed={true}
-      >
-        <ThreadHistoryHeader />
-        <ThreadHistoryNewButton />
-        <ThreadHistorySearch />
-        <ThreadHistoryList />
-      </ThreadHistory>
+      {/* Features Section */}
+      <section className="px-6 py-16">
+        <div className="max-w-4xl mx-auto">
+          <div className="grid md:grid-cols-3 gap-8">
+            <FeatureCard
+              title="Natural Language"
+              description="Describe what you want to create and let AI generate the code."
+            />
+            <FeatureCard
+              title="Live Coding"
+              description="See and hear your changes in real-time as the code evolves."
+            />
+            <FeatureCard
+              title="Learn by Doing"
+              description="Explore Strudel patterns and techniques with AI guidance."
+            />
+          </div>
+        </div>
+      </section>
 
-      {/* Beta Modal */}
-      {showBetaModal && <BetaModal onClose={() => setShowBetaModal(false)} />}
-    </Frame>
+      {/* Built with Tambo Section */}
+      <section className="px-6 py-20 border-t border-border">
+        <div className="max-w-lg mx-auto text-center">
+          <a
+            href="https://tambo.co"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block group"
+          >
+            <img
+              src="/Tambo-Vertical-Lockup-DM.svg"
+              alt="Tambo"
+              className="h-48 mx-auto mb-8 opacity-90 group-hover:opacity-100 transition-opacity"
+            />
+          </a>
+          <p className="text-lg text-foreground mb-3">
+            Built by the Tambo team
+          </p>
+          <p className="text-muted-foreground mb-6">
+            Interested in building AI-powered apps like StrudelLM? Check out
+            Tambo.
+          </p>
+          <a
+            href="https://docs.tambo.co"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-6 py-3 border border-border rounded-xl text-foreground hover:bg-muted/50 transition-colors"
+          >
+            Go to Tambo Docs
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+              />
+            </svg>
+          </a>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="px-6 py-8 border-t border-border">
+        <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
+          <p>
+            Built with{" "}
+            <a
+              href="https://strudel.cc"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+            >
+              Strudel
+            </a>{" "}
+            and{" "}
+            <a
+              href="https://tambo.co"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+            >
+              Tambo
+            </a>
+          </p>
+          <Link
+            href="/chat"
+            className="hover:text-foreground transition-colors"
+          >
+            Go to App
+          </Link>
+        </div>
+      </footer>
+    </div>
   );
 }
 
-export default function Home() {
-  const apiKey = process.env.NEXT_PUBLIC_TAMBO_API_KEY;
-
-  if (!apiKey) {
-    return <ApiKeyMissing />;
-  }
-
+function FeatureCard({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
   return (
-    <JazzAndAuthProvider>
-      <LoadingContextProvider>
-        <StrudelProvider>
-          <StrudelStorageSync />
-          <TamboProvider
-            tamboUrl={process.env.NEXT_PUBLIC_TAMBO_URL}
-            apiKey={apiKey}
-            tools={tools}
-            components={components}
-            contextHelpers={{
-              strudelState: strudelContextHelper,
-            }}
-          >
-            <AppContent />
-          </TamboProvider>
-        </StrudelProvider>
-      </LoadingContextProvider>
-    </JazzAndAuthProvider>
+    <div className="p-6 rounded-xl bg-card border border-border">
+      <h3 className="text-lg font-medium mb-2 text-foreground">{title}</h3>
+      <p className="text-muted-foreground text-sm leading-relaxed">
+        {description}
+      </p>
+    </div>
   );
 }

@@ -3,119 +3,120 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  /* Tailwind CSS Variables customized with tambo colors */
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
+    /* Tailwind CSS Variables customized with tambo colors */
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-destructive: var(--destructive);
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+    --color-chart-1: var(--chart-1);
+    --color-chart-2: var(--chart-2);
+    --color-chart-3: var(--chart-3);
+    --color-chart-4: var(--chart-4);
+    --color-chart-5: var(--chart-5);
 
-  /* Tambo Specific Variables needed for tambo components */
-  --color-container: var(--container);
-  --color-backdrop: var(--backdrop);
-  --color-muted-backdrop: var(--muted-backdrop);
+    /* Tambo Specific Variables needed for tambo components */
+    --color-container: var(--container);
+    --color-backdrop: var(--backdrop);
+    --color-muted-backdrop: var(--muted-backdrop);
 }
 
 :root {
-  /* Dark theme by default - Strudel-inspired colors */
-  --background: oklch(0.13 0.01 260);
-  --foreground: oklch(0.93 0 0);
-  --card: oklch(0.18 0.01 260);
-  --card-foreground: oklch(0.93 0 0);
-  --popover: oklch(0.18 0.01 260);
-  --popover-foreground: oklch(0.93 0 0);
-  --primary: oklch(0.75 0.18 145);
-  --primary-foreground: oklch(0.13 0 0);
-  --secondary: oklch(0.25 0.01 260);
-  --secondary-foreground: oklch(0.93 0 0);
-  --muted: oklch(0.22 0.01 260);
-  --muted-foreground: oklch(0.65 0 0);
-  --accent: oklch(0.65 0.15 145);
-  --accent-foreground: oklch(0.13 0 0);
-  --destructive: oklch(0.65 0.2 25);
-  --border: oklch(0.28 0.01 260);
-  --input: oklch(0.22 0.01 260);
-  --ring: oklch(0.75 0.18 145);
-  --chart-1: oklch(0.75 0.18 145);
-  --chart-2: oklch(0.70 0.15 200);
-  --chart-3: oklch(0.65 0.18 280);
-  --chart-4: oklch(0.70 0.15 60);
-  --chart-5: oklch(0.65 0.18 330);
+    /* Dark theme by default - Strudel-inspired colors */
+    --background: oklch(0.13 0.01 260);
+    --foreground: oklch(0.93 0 0);
+    --card: oklch(0.18 0.01 260);
+    --card-foreground: oklch(0.93 0 0);
+    --popover: oklch(0.18 0.01 260);
+    --popover-foreground: oklch(0.93 0 0);
+    --primary: oklch(0.75 0.18 145);
+    --primary-foreground: oklch(0.13 0 0);
+    --secondary: oklch(0.25 0.01 260);
+    --secondary-foreground: oklch(0.93 0 0);
+    --muted: oklch(0.22 0.01 260);
+    --muted-foreground: oklch(0.65 0 0);
+    --accent: oklch(0.65 0.15 145);
+    --accent-foreground: oklch(0.13 0 0);
+    --destructive: oklch(0.65 0.2 25);
+    --border: oklch(0.28 0.01 260);
+    --input: oklch(0.22 0.01 260);
+    --ring: oklch(0.75 0.18 145);
+    --chart-1: oklch(0.75 0.18 145);
+    --chart-2: oklch(0.7 0.15 200);
+    --chart-3: oklch(0.65 0.18 280);
+    --chart-4: oklch(0.7 0.15 60);
+    --chart-5: oklch(0.65 0.18 330);
 
-  /* Tambo Specific Variables needed for tambo components */
-  --container: oklch(0.16 0.01 260);
-  --backdrop: oklch(0 0 0 / 0.5);
-  --muted-backdrop: oklch(0 0 0 / 0.3);
-  --radius: 0.5rem;
-  --panel-left-width: 500px;
-  --panel-right-width: 500px;
-  --sidebar-width: 3rem;
+    /* Tambo Specific Variables needed for tambo components */
+    --container: oklch(0.16 0.01 260);
+    --backdrop: oklch(0 0 0 / 0.5);
+    --muted-backdrop: oklch(0 0 0 / 0.3);
+    --radius: 0.5rem;
+    --panel-left-width: 500px;
+    --panel-right-width: 500px;
+    --sidebar-width: 3rem;
 }
 
 .dark {
-  /* Dark mode inherits from root - already dark by default */
-  --background: oklch(0.13 0.01 260);
-  --foreground: oklch(0.93 0 0);
-  --card: oklch(0.18 0.01 260);
-  --card-foreground: oklch(0.93 0 0);
-  --popover: oklch(0.18 0.01 260);
-  --popover-foreground: oklch(0.93 0 0);
-  --primary: oklch(0.75 0.18 145);
-  --primary-foreground: oklch(0.13 0 0);
-  --secondary: oklch(0.25 0.01 260);
-  --secondary-foreground: oklch(0.93 0 0);
-  --muted: oklch(0.22 0.01 260);
-  --muted-foreground: oklch(0.65 0 0);
-  --accent: oklch(0.65 0.15 145);
-  --accent-foreground: oklch(0.13 0 0);
-  --destructive: oklch(0.65 0.2 25);
-  --border: oklch(0.28 0.01 260);
-  --input: oklch(0.22 0.01 260);
-  --ring: oklch(0.75 0.18 145);
-  --chart-1: oklch(0.75 0.18 145);
-  --chart-2: oklch(0.70 0.15 200);
-  --chart-3: oklch(0.65 0.18 280);
-  --chart-4: oklch(0.70 0.15 60);
-  --chart-5: oklch(0.65 0.18 330);
+    /* Dark mode inherits from root - already dark by default */
+    --background: oklch(0.13 0.01 260);
+    --foreground: oklch(0.93 0 0);
+    --card: oklch(0.18 0.01 260);
+    --card-foreground: oklch(0.93 0 0);
+    --popover: oklch(0.18 0.01 260);
+    --popover-foreground: oklch(0.93 0 0);
+    --primary: oklch(0.75 0.18 145);
+    --primary-foreground: oklch(0.13 0 0);
+    --secondary: oklch(0.25 0.01 260);
+    --secondary-foreground: oklch(0.93 0 0);
+    --muted: oklch(0.22 0.01 260);
+    --muted-foreground: oklch(0.65 0 0);
+    --accent: oklch(0.65 0.15 145);
+    --accent-foreground: oklch(0.13 0 0);
+    --destructive: oklch(0.65 0.2 25);
+    --border: oklch(0.28 0.01 260);
+    --input: oklch(0.22 0.01 260);
+    --ring: oklch(0.75 0.18 145);
+    --chart-1: oklch(0.75 0.18 145);
+    --chart-2: oklch(0.7 0.15 200);
+    --chart-3: oklch(0.65 0.18 280);
+    --chart-4: oklch(0.7 0.15 60);
+    --chart-5: oklch(0.65 0.18 330);
 
-  /* Tambo Specific Variables needed for tambo components */
-  --container: oklch(0.16 0.01 260);
-  --backdrop: oklch(0 0 0 / 0.5);
-  --muted-backdrop: oklch(0 0 0 / 0.3);
-  --radius: 0.5rem;
-  --panel-left-width: 500px;
-  --panel-right-width: 500px;
-  --sidebar-width: 3rem;
+    /* Tambo Specific Variables needed for tambo components */
+    --container: oklch(0.16 0.01 260);
+    --backdrop: oklch(0 0 0 / 0.5);
+    --muted-backdrop: oklch(0 0 0 / 0.3);
+    --radius: 0.5rem;
+    --panel-left-width: 500px;
+    --panel-right-width: 500px;
+    --sidebar-width: 3rem;
 }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-      "Liberation Mono", monospace;
-    font-size: 13px;
-  }
+    * {
+        @apply border-border outline-ring/50;
+    }
+    body {
+        @apply bg-background text-foreground;
+        font-family:
+            ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+            "Liberation Mono", monospace;
+        font-size: 13px;
+    }
 }
 
 /*
@@ -125,45 +126,45 @@ You can remove this if you don't want to use it.
 */
 
 @keyframes flash {
-  0%,
-  100% {
-    background-color: transparent;
-  }
-  50% {
-    background-color: rgb(59 130 246 / 0.3);
-  }
+    0%,
+    100% {
+        background-color: transparent;
+    }
+    50% {
+        background-color: rgb(59 130 246 / 0.3);
+    }
 }
 
 .animate-flash {
-  animation: flash 1s ease-in-out;
+    animation: flash 1s ease-in-out;
 }
 
 /*
 Animated gradient for thinking text, creates a shimmering effect that moves across the text.
 */
 @keyframes thinking-gradient {
-  0% {
-    background-position: -200% center;
-  }
-  100% {
-    background-position: 200% center;
-  }
+    0% {
+        background-position: -200% center;
+    }
+    100% {
+        background-position: 200% center;
+    }
 }
 
 .animate-thinking-gradient {
-  /* Strudel green gradient for dark theme */
-  background: linear-gradient(90deg, #4a5 0%, #8f8 50%, #4a5 100%);
-  background: linear-gradient(
-    90deg,
-    oklch(0.5 0.15 145) 0%,
-    oklch(0.8 0.18 145) 50%,
-    oklch(0.5 0.15 145) 100%
-  );
-  background-size: 200% 100%;
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: thinking-gradient 2s linear infinite;
+    /* Strudel green gradient for dark theme */
+    background: linear-gradient(90deg, #4a5 0%, #8f8 50%, #4a5 100%);
+    background: linear-gradient(
+        90deg,
+        oklch(0.5 0.15 145) 0%,
+        oklch(0.8 0.18 145) 50%,
+        oklch(0.5 0.15 145) 100%
+    );
+    background-size: 200% 100%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: thinking-gradient 2s linear infinite;
 }
 
 /*
@@ -171,121 +172,220 @@ CodeMirror theme customization for Strudel editor
 Uses Tailwind CSS variables for consistency with the rest of the app
 */
 .cm-editor {
-  background-color: var(--background) !important;
-  color: var(--foreground) !important;
+    background-color: var(--background) !important;
+    color: var(--foreground) !important;
 }
 
 .cm-editor .cm-content {
-  caret-color: var(--primary) !important;
+    caret-color: var(--primary) !important;
 }
 
 .cm-editor .cm-cursor {
-  border-left-color: var(--primary) !important;
+    border-left-color: var(--primary) !important;
 }
 
 .cm-editor .cm-activeLine {
-  background-color: color-mix(in oklch, var(--muted) 50%, transparent) !important;
+    background-color: color-mix(
+        in oklch,
+        var(--muted) 50%,
+        transparent
+    ) !important;
 }
 
 .cm-editor .cm-gutters {
-  background-color: transparent !important;
-  border-right: none !important;
+    background-color: transparent !important;
+    border-right: none !important;
 }
 
 .cm-editor .cm-lineNumbers .cm-gutterElement {
-  color: var(--muted-foreground) !important;
-  opacity: 0.5;
+    color: var(--muted-foreground) !important;
+    opacity: 0.5;
 }
 
 .cm-editor .cm-selectionBackground,
 .cm-editor.cm-focused .cm-selectionBackground {
-  background-color: color-mix(in oklch, var(--primary) 20%, transparent) !important;
+    background-color: color-mix(
+        in oklch,
+        var(--primary) 20%,
+        transparent
+    ) !important;
 }
 
 /* Autocomplete dropdown */
 .cm-tooltip-autocomplete {
-  background-color: var(--popover) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 0.375rem !important;
+    background-color: var(--popover) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 0.375rem !important;
 }
 
 .cm-tooltip-autocomplete ul li {
-  color: var(--foreground) !important;
+    color: var(--foreground) !important;
 }
 
 .cm-tooltip-autocomplete ul li[aria-selected] {
-  background-color: var(--primary) !important;
-  color: var(--primary-foreground) !important;
+    background-color: var(--primary) !important;
+    color: var(--primary-foreground) !important;
 }
 
 /* Syntax highlighting - uses chart colors for variety */
 .cm-editor .cm-keyword {
-  color: var(--primary) !important;
+    color: var(--primary) !important;
 }
 
 .cm-editor .cm-string {
-  color: var(--chart-4) !important;
+    color: var(--chart-4) !important;
 }
 
 .cm-editor .cm-number {
-  color: var(--chart-2) !important;
+    color: var(--chart-2) !important;
 }
 
 .cm-editor .cm-comment {
-  color: var(--muted-foreground) !important;
-  font-style: italic;
+    color: var(--muted-foreground) !important;
+    font-style: italic;
 }
 
 .cm-editor .cm-variableName {
-  color: var(--foreground) !important;
+    color: var(--foreground) !important;
 }
 
 .cm-editor .cm-function {
-  color: var(--chart-3) !important;
+    color: var(--chart-3) !important;
 }
 
 .cm-editor .cm-operator {
-  color: var(--chart-5) !important;
+    color: var(--chart-5) !important;
 }
 
 /* Pattern highlighting - Strudel uses this to show active events */
 .cm-editor .cm-strudel-flash {
-  background-color: color-mix(in oklch, var(--primary) 30%, transparent) !important;
-  border-radius: 2px;
+    background-color: color-mix(
+        in oklch,
+        var(--primary) 30%,
+        transparent
+    ) !important;
+    border-radius: 2px;
 }
 
 /* Tooltips and other popups */
 .cm-tooltip {
-  background-color: var(--popover) !important;
-  border: 1px solid var(--border) !important;
-  color: var(--popover-foreground) !important;
+    background-color: var(--popover) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--popover-foreground) !important;
 }
 
 /* Matching brackets */
 .cm-editor .cm-matchingBracket {
-  background-color: color-mix(in oklch, var(--accent) 30%, transparent) !important;
-  outline: 1px solid var(--accent) !important;
+    background-color: color-mix(
+        in oklch,
+        var(--accent) 30%,
+        transparent
+    ) !important;
+    outline: 1px solid var(--accent) !important;
 }
 
 /* CodeMirror scrollbar styling */
 .cm-editor .cm-scroller::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+    width: 6px;
+    height: 6px;
 }
 
 .cm-editor .cm-scroller::-webkit-scrollbar-track {
-  background: transparent;
+    background: transparent;
 }
 
 .cm-editor .cm-scroller::-webkit-scrollbar-thumb {
-  background-color: var(--border);
-  border-radius: 3px;
+    background-color: var(--border);
+    border-radius: 3px;
 }
 
 .cm-editor .cm-scroller::-webkit-scrollbar-thumb:hover {
-  background-color: var(--muted-foreground);
+    background-color: var(--muted-foreground);
 }
 
 .cm-editor .cm-scroller::-webkit-scrollbar-corner {
-  background: transparent;
+    background: transparent;
+}
+
+/* Landing page animations */
+@keyframes landing-float {
+    0%,
+    100% {
+        transform: translate(0, 0) scale(1);
+        opacity: 0.15;
+    }
+    50% {
+        transform: translate(20px, -30px) scale(1.1);
+        opacity: 0.25;
+    }
+}
+
+@keyframes landing-float-reverse {
+    0%,
+    100% {
+        transform: translate(0, 0) scale(1);
+        opacity: 0.1;
+    }
+    50% {
+        transform: translate(-30px, 20px) scale(1.15);
+        opacity: 0.2;
+    }
+}
+
+@keyframes landing-pulse {
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 0.12;
+    }
+    50% {
+        transform: scale(1.2);
+        opacity: 0.18;
+    }
+}
+
+.landing-glow {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    will-change: transform, opacity;
+}
+
+.landing-glow-1 {
+    width: 400px;
+    height: 400px;
+    top: 10%;
+    left: 10%;
+    background: var(--primary);
+    animation: landing-float 12s ease-in-out infinite;
+}
+
+.landing-glow-2 {
+    width: 300px;
+    height: 300px;
+    top: 50%;
+    right: 15%;
+    background: var(--accent);
+    animation: landing-float-reverse 15s ease-in-out infinite;
+    animation-delay: -3s;
+}
+
+.landing-glow-3 {
+    width: 250px;
+    height: 250px;
+    bottom: 20%;
+    left: 30%;
+    background: var(--chart-3);
+    animation: landing-pulse 10s ease-in-out infinite;
+    animation-delay: -5s;
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+    .landing-glow-1,
+    .landing-glow-2,
+    .landing-glow-3 {
+        animation: none;
+        opacity: 0.15;
+    }
 }
