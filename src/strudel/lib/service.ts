@@ -489,7 +489,13 @@ export class StrudelService {
 
   getCursorLocation(): number | null {
     if (!this.editorInstance) return null;
-    return this.editorInstance.getCursorLocation();
+
+    const getCursorLocation = (this.editorInstance as unknown as {
+      getCursorLocation?: () => number;
+    }).getCursorLocation;
+
+    if (typeof getCursorLocation !== "function") return null;
+    return getCursorLocation.call(this.editorInstance);
   }
 
   /**

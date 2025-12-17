@@ -62,49 +62,26 @@ function stripTrailingVisualizationFromLine(
 }
 
 function getDetectedVisualization(code: string): VisualizationOrOff {
-  let best: { type: VisualizationType; index: number } | null = null;
-
-  for (const candidate of VISUALIZATION_OPTIONS) {
-    const callVariants = [candidate.methodCall, ...(candidate.aliases ?? [])];
-    for (const call of callVariants) {
-      const idx = code.lastIndexOf(call);
-      if (idx === -1) continue;
-
-      if (!best || idx > best.index) {
-        best = { type: candidate.id, index: idx };
-      }
-    }
+  const lines = code.split("\n");
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i] ?? "";
+    const { type } = stripTrailingVisualizationFromLine(line);
+    if (type) return type;
   }
-
-  return best?.type ?? null;
+  return null;
 }
 
 function stripVisualizationsFromCode(
   code: string,
 ): { detectedVisualization: VisualizationOrOff; strippedCode: string } {
-  const hadTrailingNewline = code.endsWith("\n");
-  const rawLines = code.split("\n");
-  const lines = hadTrailingNewline ? rawLines.slice(0, -1) : rawLines;
-
   let detectedVisualization: VisualizationOrOff = null;
-  const updatedLines: string[] = [];
-
-  for (const line of lines) {
+  const updatedLines = code.split("\n").map((line) => {
     const { type, strippedLine } = stripTrailingVisualizationFromLine(line);
     if (type) detectedVisualization = type;
-    if (type && !strippedLine.trim()) {
-      continue;
-    }
+    return strippedLine;
+  });
 
-    updatedLines.push(strippedLine);
-  }
-
-  const updated = updatedLines.join("\n");
-
-  return {
-    detectedVisualization,
-    strippedCode: hadTrailingNewline ? `${updated}\n` : updated,
-  };
+  return { detectedVisualization, strippedCode: updatedLines.join("\n") };
 }
 
 function getLineIndexFromCursorLocation(
@@ -164,9 +141,7 @@ function setVisualization(
     return code;
   }
 
-  const hadTrailingNewline = strippedCode.endsWith("\n");
-  const rawLines = strippedCode.split("\n");
-  const lines = hadTrailingNewline ? rawLines.slice(0, -1) : rawLines;
+  const lines = strippedCode.split("\n");
 
   const clampedPreferredIndex = Math.min(
     Math.max(preferredLineIndex, 0),
@@ -197,7 +172,7 @@ function setVisualization(
   }
 
   const updated = lines.join("\n");
-  return hadTrailingNewline ? `${updated}\n` : updated;
+  return updated;
 }
 
 export function VisualizationToggle({

@@ -42,7 +42,7 @@ export const components: TamboComponent[] = [
   {
     name: "VisualizationToggle",
     description:
-      "Toggle Strudel visualizations by appending/removing a visualization call at the current cursor line (so the visualization renders underneath it). Supports: `._pianoroll()` (notes), `._waveform()` (audio waveform), and `._spectrum()` (frequency spectrum).",
+      "Toggle Strudel visualizations by appending/removing a visualization call at the current cursor line (so the visualization renders underneath it). Keeps a single active visualization by stripping any other visualization calls in the editor. Supports: `._pianoroll()` (notes), `._waveform()` (audio waveform), and `._spectrum()` (frequency spectrum).",
     component: VisualizationToggle,
     propsSchema: visualizationToggleSchema,
   },
