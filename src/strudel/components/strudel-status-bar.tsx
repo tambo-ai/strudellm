@@ -1,6 +1,5 @@
 import { cn } from "@/lib/utils";
 import { useStrudel } from "@/strudel/context/strudel-provider";
-import { StrudelService } from "@/strudel/lib/service";
 import {
   useTamboContextAttachment,
   useTamboThread,
@@ -20,12 +19,7 @@ function categorizeError(error: string | Error): string {
   const lowerMsg = errorMsg.toLowerCase();
 
   // Check for sample/sound related errors (e.g., "sound supersquare not found! Is it loaded?")
-  if (
-    lowerMsg.includes("sample") ||
-    lowerMsg.includes("not found") ||
-    lowerMsg.includes("not loaded") ||
-    lowerMsg.includes("is it loaded")
-  ) {
+  if (/\b(?:sound|sample)\s+.+\s+not\s+found\b/i.test(errorMsg)) {
     return "invalid_sample";
   }
   if (lowerMsg.includes("undefined") || lowerMsg.includes("not a pattern")) {
@@ -58,7 +52,8 @@ export function StrudelStatusBar() {
   } = useStrudel();
   const { startNewThread } = useTamboThread();
   const { setValue, value } = useTamboThreadInput();
-  const { addContextAttachment } = useTamboContextAttachment();
+  const { attachments, addContextAttachment, removeContextAttachment } =
+    useTamboContextAttachment();
 
   // Auto-dismiss revert notification after a delay
   React.useEffect(() => {
@@ -72,19 +67,47 @@ export function StrudelStatusBar() {
 
   const handleErrorClick = React.useCallback(() => {
     const errorMessage = typeof error === "string" ? error : error?.message;
-    const errorType = error ? categorizeError(error) : "unknown";
+    const errorType = missingSample
+      ? "invalid_sample"
+      : error
+        ? categorizeError(error)
+        : "unknown";
 
-    // Add error context as a context attachment
-    addContextAttachment({
-      name: "Strudel Error",
-      icon: <AlertCircle className="w-3 h-3" />,
-      metadata: {
-        errorType,
-        errorMessage,
-        missingSample,
-        code,
-      },
-    });
+    const attachmentKey = [missingSample ?? "", errorMessage ?? "", code].join(
+      "|",
+    );
+    const existing = attachments.find((a) => a.name === "Strudel Error");
+
+    if (existing && existing.metadata?.attachmentKey !== attachmentKey) {
+      removeContextAttachment(existing.id);
+      setTimeout(() => {
+        addContextAttachment({
+          name: "Strudel Error",
+          icon: <AlertCircle className="w-3 h-3" />,
+          metadata: {
+            attachmentKey,
+            errorType,
+            errorMessage,
+            missingSample,
+            code,
+          },
+        });
+      }, 0);
+    }
+
+    if (!existing) {
+      addContextAttachment({
+        name: "Strudel Error",
+        icon: <AlertCircle className="w-3 h-3" />,
+        metadata: {
+          attachmentKey,
+          errorType,
+          errorMessage,
+          missingSample,
+          code,
+        },
+      });
+    }
 
     // If input is empty, add default message
     if (!value?.trim()) {
@@ -95,9 +118,16 @@ export function StrudelStatusBar() {
       }
     }
 
-    // Clear the error
-    StrudelService.instance().clearError();
-  }, [error, code, value, setValue, addContextAttachment, missingSample]);
+  }, [
+    addContextAttachment,
+    attachments,
+    code,
+    error,
+    missingSample,
+    removeContextAttachment,
+    setValue,
+    value,
+  ]);
 
   return (
     <>
@@ -105,7 +135,7 @@ export function StrudelStatusBar() {
       {revertNotification && (
         <div className="px-3 py-2 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-t border-amber-500/30 flex items-center gap-2">
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
-          <span className="text-sm">{revertNotification}</span>
+          <span className="text-sm">{revertNotification.message}</span>
           <button
             onClick={clearRevertNotification}
             className="ml-auto text-xs opacity-60 hover:opacity-100"

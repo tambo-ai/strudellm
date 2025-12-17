@@ -10,7 +10,7 @@ type StrudelContextValue = {
   code: string;
   error: string | Error | null;
   missingSample: string | null;
-  revertNotification: string | null;
+  revertNotification: { id: number; message: string } | null;
   clearRevertNotification: () => void;
   setCode: (code: string, shouldPlay?: boolean) => void;
   setThreadId: (threadId: string | null) => void;
@@ -55,9 +55,6 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
     isAiUpdatingRef.current = isAiUpdating;
   }, [isAiUpdating]);
   const [allRepls, setAllRepls] = React.useState<ReplSummary[]>([]);
-  const [revertNotification, setRevertNotification] = React.useState<
-    string | null
-  >(null);
   const [currentReplId, setCurrentReplId] = React.useState<string | null>(() =>
     strudelService.getCurrentReplId(),
   );
@@ -76,19 +73,27 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
 
     const replUnsubscribe = strudelService.onStateChange((newState) => {
       setReplState((prevState) => {
+        const hasEvalError = Object.prototype.hasOwnProperty.call(
+          newState,
+          "evalError",
+        );
+        const hasSchedulerError = Object.prototype.hasOwnProperty.call(
+          newState,
+          "schedulerError",
+        );
+        const hasMissingSample = Object.prototype.hasOwnProperty.call(
+          newState,
+          "missingSample",
+        );
+
         // Preserve existing errors if the new state omits them
-        const evalError =
-          newState.evalError !== undefined
-            ? newState.evalError
-            : prevState?.evalError;
-        const schedulerError =
-          newState.schedulerError !== undefined
-            ? newState.schedulerError
-            : prevState?.schedulerError;
-        const missingSample =
-          newState.missingSample !== undefined
-            ? newState.missingSample
-            : prevState?.missingSample ?? null;
+        const evalError = hasEvalError ? newState.evalError : prevState?.evalError;
+        const schedulerError = hasSchedulerError
+          ? newState.schedulerError
+          : prevState?.schedulerError;
+        const missingSample = hasMissingSample
+          ? newState.missingSample
+          : prevState?.missingSample ?? null;
 
         // Check if a new error appeared while playing (user-caused error, not AI)
         // Only stop if: was playing, no previous error, now has error, not AI updating
@@ -110,8 +115,6 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
           missingSample,
         };
       });
-      // Sync revert notification from service
-      setRevertNotification(strudelService.revertNotification);
     });
 
     if (!strudelService.isReady) {
@@ -191,7 +194,6 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
 
   const clearRevertNotification = React.useCallback(() => {
     strudelService.clearRevertNotification();
-    setRevertNotification(null);
   }, []);
 
   const providerValue: StrudelContextValue = React.useMemo(() => {
@@ -202,6 +204,7 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
       evalError,
       schedulerError,
       missingSample,
+      revertNotification,
     } = replState || { started: false, code: "", activeCode: "" };
     // Has unevaluated changes if playing and current code differs from what's being played
     const hasUnevaluatedChanges = isPlaying && code !== activeCode;
@@ -209,7 +212,7 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
       code,
       error: evalError || schedulerError || null,
       missingSample: missingSample ?? null,
-      revertNotification,
+      revertNotification: revertNotification ?? null,
       clearRevertNotification,
       isPlaying,
       hasUnevaluatedChanges,
@@ -257,7 +260,6 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
     deleteRepl,
     replState,
     isAiUpdating,
-    revertNotification,
     clearRevertNotification,
   ]);
 

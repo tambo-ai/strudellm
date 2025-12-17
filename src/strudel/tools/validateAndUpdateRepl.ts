@@ -188,7 +188,7 @@ export const validateAndUpdateRepl: TamboTool = {
       }
     }
 
-    const result = await service.updateAndPlay(code);
+    const result = await service.updateAndPlay(code, { source: "ai" });
 
     return result;
   },

@@ -33,6 +33,8 @@ import { DEFAULT_KEYBINDINGS, getKeybindings } from "@/lib/editor-preferences";
 type LoadingCallback = (status: string, progress: number) => void;
 type CodeChangeCallback = (state: StrudelReplState) => void;
 
+type UpdateSource = "ai" | "user";
+
 const DEFAULT_CODE = `// Welcome to StrudelLM!
 // Write patterns here or ask the AI for help
 
@@ -69,6 +71,7 @@ export class StrudelService {
     code: DEFAULT_CODE,
     started: false,
     missingSample: null,
+    revertNotification: null,
   } as StrudelReplState;
   // Global handlers for async scheduler errors
   private unhandledRejectionHandler: ((
@@ -77,8 +80,9 @@ export class StrudelService {
   private errorHandler: ((event: ErrorEvent) => void) | null = null;
   private originalConsoleError: ((...data: any[]) => void) | null = null;
 
-  // Notification for when AI code fails and we revert
-  private _revertNotification: string | null = null;
+  private revertNotificationId = 0;
+  private updateOperationId = 0;
+  private pendingSchedulerWaitCancel: (() => void) | null = null;
 
   // Thread/REPL persistence state
   private currentThreadId: string | null = null;
@@ -166,18 +170,10 @@ export class StrudelService {
   }
 
   /**
-   * Get the current revert notification message (if any)
-   */
-  get revertNotification(): string | null {
-    return this._revertNotification;
-  }
-
-  /**
    * Clear the revert notification
    */
   clearRevertNotification = (): void => {
-    this._revertNotification = null;
-    this.notifyStateChange(this._state);
+    this.notifyStateChange({ revertNotification: null } as StrudelReplState);
   };
 
   // ============================================
@@ -458,13 +454,27 @@ export class StrudelService {
   };
 
   private notifyStateChange(state: StrudelReplState): void {
+    const hasEvalError = Object.prototype.hasOwnProperty.call(state, "evalError");
+    const hasSchedulerError = Object.prototype.hasOwnProperty.call(
+      state,
+      "schedulerError",
+    );
+    const hasMissingSample = Object.prototype.hasOwnProperty.call(
+      state,
+      "missingSample",
+    );
+
     const mergedState: StrudelReplState = {
       ...this._state,
       ...state,
       // Preserve existing errors/missingSample unless new values are provided
-      evalError: state.evalError ?? this._state.evalError,
-      schedulerError: state.schedulerError ?? this._state.schedulerError,
-      missingSample: state.missingSample ?? this._state.missingSample,
+      evalError: hasEvalError ? state.evalError : this._state.evalError,
+      schedulerError: hasSchedulerError
+        ? state.schedulerError
+        : this._state.schedulerError,
+      missingSample: hasMissingSample
+        ? state.missingSample
+        : this._state.missingSample,
     };
 
     this._state = mergedState;
@@ -611,12 +621,7 @@ export class StrudelService {
   };
 
   private isSampleErrorMessage(message: string): boolean {
-    const lowerMessage = message.toLowerCase();
-    return (
-      lowerMessage.includes("sample") ||
-      lowerMessage.includes("sound") ||
-      lowerMessage.includes("not found")
-    );
+    return /\b(?:sound|sample)\s+.+\s+not\s+found\b/i.test(message);
   }
 
   private isAudioWorkletErrorMessage(message: string): boolean {
@@ -666,11 +671,9 @@ export class StrudelService {
               ? reason
               : "";
 
-        const shouldHandle =
-          !!message && this.isResourceErrorMessage(message);
+        const shouldHandle = !!message && this.isResourceErrorMessage(message);
 
         if (shouldHandle) {
-          event.preventDefault?.(); // avoid noisy unhandled rejection logs
           this.captureSchedulerError(reason);
         }
       };
@@ -683,12 +686,9 @@ export class StrudelService {
     if (!this.errorHandler) {
       this.errorHandler = (event: ErrorEvent) => {
         const message = event.message || (event.error?.message ?? "");
-        const shouldHandle =
-          this.isResourceErrorMessage(message);
+        const shouldHandle = this.isResourceErrorMessage(message);
 
         if (shouldHandle) {
-          event.preventDefault?.(); // silence console error spam
-          event.stopImmediatePropagation?.();
           this.captureSchedulerError(event.error || message);
         }
       };
@@ -718,6 +718,7 @@ export class StrudelService {
    * Filter out sample-not-found noise while keeping other errors visible.
    */
   private installConsoleErrorFilter(): void {
+    if (process.env.NODE_ENV !== "development") return;
     if (this.originalConsoleError || typeof console === "undefined") return;
 
     this.originalConsoleError = console.error;
@@ -890,11 +891,6 @@ const keybindings = getKeybindings();
       if (typeof this.editorInstance.changeSetting === "function") {
         this.editorInstance.changeSetting("keybindings", resolvedKeybindings);
       }
-
-      // Handle async scheduler errors that surface as unhandled rejections/errors
-      this.registerGlobalErrorHandlers();
-      // Swallow Strudel's dev console.error spam for missing samples
-      this.installConsoleErrorFilter();
       await this.prebake();
 
       if (oldEditor) {
@@ -924,6 +920,9 @@ const keybindings = getKeybindings();
    * Detach the editor from its container
    */
   detach(): void {
+    this.unregisterGlobalErrorHandlers();
+    this.removeConsoleErrorFilter();
+
     if (this.editorInstance) {
       this.editorInstance.dispose?.();
       this.editorInstance = null;
@@ -947,6 +946,8 @@ const keybindings = getKeybindings();
   // ============================================
 
   play = async (): Promise<void> => {
+    this.registerGlobalErrorHandlers();
+    this.installConsoleErrorFilter();
     try {
       return await this.editorInstance?.evaluate();
     } catch (error) {
@@ -954,11 +955,15 @@ const keybindings = getKeybindings();
       // during evaluate. The onError callback should also capture these,
       // but we catch here to prevent unhandled rejections.
       this.captureSchedulerError(error);
+      this.unregisterGlobalErrorHandlers();
+      this.removeConsoleErrorFilter();
     }
   };
 
   stop = (): void => {
     this.editorInstance?.repl.stop();
+    this.unregisterGlobalErrorHandlers();
+    this.removeConsoleErrorFilter();
   };
 
   evaluate = async (code: string, play: boolean = false): Promise<void> => {
@@ -976,29 +981,68 @@ const keybindings = getKeybindings();
    * Returns the error if one occurs within the timeout, or null.
    */
   private waitForSchedulerError = (
+    operationId: number,
     timeoutMs: number = 500,
   ): Promise<Error | null> => {
     return new Promise((resolve) => {
       let resolved = false;
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+      let unsubscribe = () => {};
+
+      const cancel = () => {
+        if (resolved) return;
+        resolved = true;
+        unsubscribe();
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+        if (this.pendingSchedulerWaitCancel === cancel) {
+          this.pendingSchedulerWaitCancel = null;
+        }
+        resolve(null);
+      };
 
       // Set up a one-time listener for state changes
-      const unsubscribe = this.onStateChange((state) => {
+      unsubscribe = this.onStateChange((state) => {
+        if (operationId !== this.updateOperationId) {
+          cancel();
+          return;
+        }
+
         if (!resolved && state.schedulerError) {
           resolved = true;
           unsubscribe();
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
+          if (this.pendingSchedulerWaitCancel === cancel) {
+            this.pendingSchedulerWaitCancel = null;
+          }
           resolve(state.schedulerError);
         }
       });
 
       // After timeout, resolve with null (no error) or current error
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
+        if (operationId !== this.updateOperationId) {
+          cancel();
+          return;
+        }
+
         if (!resolved) {
           resolved = true;
           unsubscribe();
+          if (this.pendingSchedulerWaitCancel === cancel) {
+            this.pendingSchedulerWaitCancel = null;
+          }
           // Check one more time for any error that might have been set
           resolve(this._state.schedulerError || null);
         }
       }, timeoutMs);
+
+      this.pendingSchedulerWaitCancel?.();
+      this.pendingSchedulerWaitCancel = cancel;
     });
   };
 
@@ -1010,7 +1054,17 @@ const keybindings = getKeybindings();
    * before applying and playing it. If the code fails, reverts to
    * the previous working code and restarts playback if it was playing.
    */
-  updateAndPlay = async (code: string) => {
+  updateAndPlay = async (
+    code: string,
+    options?: {
+      source?: UpdateSource;
+    },
+  ) => {
+    const source = options?.source ?? "ai";
+
+    this.updateOperationId += 1;
+    const operationId = this.updateOperationId;
+
     // Save current state before attempting update
     const previousCode = this.getCode();
     const wasPlaying = this.isPlaying;
@@ -1030,6 +1084,10 @@ const keybindings = getKeybindings();
       // Try to evaluate/play the new code
       await this.play();
 
+      if (operationId !== this.updateOperationId) {
+        return { success: false, error: "Update superseded by a newer update." };
+      }
+
       // Check if there was an immediate evaluation error
       const state = this.getReplState();
       if (state.evalError) {
@@ -1039,7 +1097,9 @@ const keybindings = getKeybindings();
             : state.evalError.message || String(state.evalError);
 
         // Revert to previous working code
-        await this.revertToCode(previousCode, wasPlaying);
+        if (operationId === this.updateOperationId) {
+          await this.revertToCode(previousCode, wasPlaying, source);
+        }
 
         return {
           success: false,
@@ -1049,7 +1109,11 @@ const keybindings = getKeybindings();
 
       // Wait for potential async scheduler errors (like "sound X not found")
       // These happen when the scheduler starts playing and discovers missing samples
-      const schedulerError = await this.waitForSchedulerError(500);
+      const schedulerError = await this.waitForSchedulerError(operationId, 500);
+
+      if (operationId !== this.updateOperationId) {
+        return { success: false, error: "Update superseded by a newer update." };
+      }
       if (schedulerError) {
         const errorMsg =
           typeof schedulerError === "string"
@@ -1057,7 +1121,9 @@ const keybindings = getKeybindings();
             : schedulerError.message || String(schedulerError);
 
         // Revert to previous working code
-        await this.revertToCode(previousCode, wasPlaying);
+        if (operationId === this.updateOperationId) {
+          await this.revertToCode(previousCode, wasPlaying, source);
+        }
 
         return {
           success: false,
@@ -1080,7 +1146,9 @@ const keybindings = getKeybindings();
         finalState.activeCode === code
       ) {
         // Revert to previous working code
-        await this.revertToCode(previousCode, wasPlaying);
+        if (operationId === this.updateOperationId) {
+          await this.revertToCode(previousCode, wasPlaying, source);
+        }
 
         return {
           success: false,
@@ -1091,7 +1159,9 @@ const keybindings = getKeybindings();
       return { success: true, code };
     } catch (error) {
       // On any error, revert to previous working code
-      await this.revertToCode(previousCode, wasPlaying);
+      if (operationId === this.updateOperationId) {
+        await this.revertToCode(previousCode, wasPlaying, source);
+      }
 
       return { success: false, error: (error as Error).message };
     }
@@ -1104,6 +1174,7 @@ const keybindings = getKeybindings();
   private revertToCode = async (
     code: string,
     restartPlayback: boolean,
+    source: UpdateSource,
   ): Promise<void> => {
     // Stop any current playback
     this.stop();
@@ -1111,10 +1182,15 @@ const keybindings = getKeybindings();
     // Clear errors from the failed attempt
     this.clearError();
 
-    // Set notification to inform user about the revert
-    this._revertNotification =
-      "StrudelLM made a mistake. It's going to fix it and try again.";
-    this.notifyStateChange(this._state);
+    if (source === "ai") {
+      this.revertNotificationId += 1;
+      this.notifyStateChange({
+        revertNotification: {
+          id: this.revertNotificationId,
+          message: "That update didn't play. Reverted to the last working pattern.",
+        },
+      } as StrudelReplState);
+    }
 
     // Restore the previous code
     this.setCode(code);
@@ -1163,8 +1239,6 @@ const keybindings = getKeybindings();
   dispose(): void {
     this.stop();
     this.detach();
-    this.unregisterGlobalErrorHandlers();
-    this.removeConsoleErrorFilter();
 
     this.loadingCallbacks = [];
     this.stateChangeCallbacks = [];
