@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { Resend } from "resend";
 import { z } from "zod";
 
@@ -7,8 +8,6 @@ const isProduction = process.env.NODE_ENV === "production";
 const feedbackRequestSchema = z.object({
   title: z.string().min(3).max(80),
   body: z.string().min(10).max(4000),
-  issueType: z.enum(["bug", "feature", "question", "other"]).optional(),
-  userEmail: z.string().email().nullable().optional(),
 });
 
 function escapeHtml(str: string | null | undefined) {
@@ -22,6 +21,18 @@ function escapeHtml(str: string | null | undefined) {
 }
 
 export async function POST(req: Request) {
+  const session = await auth.api.getSession({
+    headers: req.headers,
+    asResponse: false,
+  });
+
+  if (!session?.user?.email) {
+    return NextResponse.json(
+      { ok: false, error: "Sign in required" },
+      { status: 401 },
+    );
+  }
+
   let payload: unknown;
   try {
     payload = await req.json();
@@ -40,7 +51,8 @@ export async function POST(req: Request) {
     );
   }
 
-  const { title, body, issueType, userEmail } = parsed.data;
+  const { title, body } = parsed.data;
+  const userEmail = session.user.email;
 
   // In development (and in production without RESEND_API_KEY), log feedback rather than fail hard.
   // This keeps local dev usable without requiring email credentials.
@@ -57,7 +69,6 @@ export async function POST(req: Request) {
     console.log("[feedback]", {
       title,
       body,
-      issueType: issueType ?? "other",
       userEmail,
     });
     return NextResponse.json({ ok: true, delivered: false });
@@ -77,8 +88,7 @@ export async function POST(req: Request) {
       <h2>${escapeHtml(title)}</h2>
       <p style="white-space: pre-wrap;">${escapeHtml(body)}</p>
       <hr />
-      <p><strong>Issue type:</strong> ${escapeHtml(issueType ?? "other")}</p>
-      <p><strong>User email:</strong> ${escapeHtml(userEmail ?? "(not provided)")}</p>
+      <p><strong>User email:</strong> ${escapeHtml(userEmail)}</p>
     </div>
   `;
 
@@ -88,7 +98,7 @@ export async function POST(req: Request) {
       to,
       subject,
       html,
-      replyTo: userEmail ?? undefined,
+      replyTo: userEmail,
     });
     return NextResponse.json({ ok: true, delivered: true });
   } catch (error) {

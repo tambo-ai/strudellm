@@ -3,17 +3,11 @@
 import { config } from "@/lib/config";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/lib/auth-client";
+import { AuthModal } from "@/components/auth/auth-modal";
 import { useTamboComponentState, useTamboStreamStatus } from "@tambo-ai/react";
 import { ExternalLink } from "lucide-react";
 import * as React from "react";
 import { z } from "zod/v3";
-
-const issueTypeSchema = z
-  .enum(["bug", "feature", "question", "other"])
-  .optional()
-  .describe(
-    "Internal-only classification for maintainers. Do NOT show this in the UI. Choose: bug (broken behavior), feature (unsupported request), question (unclear usage), other (fallback).",
-  );
 
 export const feedbackFormSchema = z.object({
   title: z
@@ -30,39 +24,27 @@ export const feedbackFormSchema = z.object({
     .describe(
       "A longer description of what the user is trying to do, what they expected, and what happened instead.",
     ),
-  issueType: issueTypeSchema,
 });
 
 export type FeedbackFormProps = z.infer<typeof feedbackFormSchema>;
 
 function buildGithubIssueBody({
   body,
-  issueType,
-  userEmail,
 }: {
   body: string;
-  issueType: "bug" | "feature" | "question" | "other";
-  userEmail?: string | null;
 }): string {
   const cleanedBody = body.trim() || "(no additional details provided)";
-  const metaLines: string[] = ["<!-- submitted-via: StrudelLM FeedbackForm -->"];
+  const metaLine = "<!-- submitted-via: StrudelLM FeedbackForm -->";
 
-  if (issueType) {
-    metaLines.push(`<!-- tambo-issue-type: ${issueType} -->`);
-  }
-  if (userEmail) {
-    metaLines.push(`<!-- reporter-email: ${userEmail} -->`);
-  }
-
-  return `${cleanedBody}\n\n${metaLines.join("\n")}\n`;
+  return `${cleanedBody}\n\n${metaLine}\n`;
 }
 
 export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
-  ({ title, body, issueType }, ref) => {
+  ({ title, body }, ref) => {
     const { streamStatus, propStatus } = useTamboStreamStatus<FeedbackFormProps>();
     const { data: session } = useSession();
-    const userEmail = session?.user?.email ?? null;
-    const effectiveIssueType = issueType ?? "other";
+    const isSignedIn = Boolean(session?.user?.email);
+    const [showAuthModal, setShowAuthModal] = React.useState(false);
 
     const [draftTitle, setDraftTitle] = useTamboComponentState<string>(
       "draftTitle",
@@ -105,39 +87,28 @@ export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
     ]);
 
     const githubIssueUrl = React.useMemo(() => {
-      if (!isSubmitted) return null;
-
       const params = new URLSearchParams();
       params.set("title", (draftTitle ?? "").trim());
-      if (effectiveIssueType !== "other") {
-        params.set(
-          "labels",
-          effectiveIssueType === "feature" ? "enhancement" : effectiveIssueType,
-        );
-      }
       params.set(
         "body",
         buildGithubIssueBody({
           body: draftBody ?? "",
-          issueType: effectiveIssueType,
-          userEmail,
         }),
       );
 
       return `${config.githubNewIssue}?${params.toString()}`;
-    }, [
-      isSubmitted,
-      draftTitle,
-      draftBody,
-      effectiveIssueType,
-      userEmail,
-    ]);
+    }, [draftTitle, draftBody]);
 
     const isDisabled = isSubmitted || isSending;
 
     const onSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       if (isDisabled) return;
+
+      if (!isSignedIn) {
+        setShowAuthModal(true);
+        return;
+      }
 
       setSubmitError(null);
       setIsSending(true);
@@ -150,8 +121,6 @@ export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
           body: JSON.stringify({
             title: draftTitle ?? "",
             body: draftBody ?? "",
-            issueType: effectiveIssueType,
-            userEmail,
           }),
         });
 
@@ -268,42 +237,84 @@ export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
           )}
 
           <div className="space-y-3">
-            <button
-              type="submit"
-              disabled={
-                isDisabled ||
-                !(draftTitle ?? "").trim() ||
-                !(draftBody ?? "").trim() ||
-                streamStatus.isStreaming
-              }
-              className={cn(
-                "w-full px-4 py-2 rounded-md transition-colors",
-                isSubmitted
-                  ? "bg-muted text-muted-foreground"
-                  : "bg-primary text-primary-foreground hover:bg-primary/90",
-                "disabled:opacity-50 disabled:cursor-not-allowed",
-              )}
-            >
-              {isSubmitted
-                ? "Submitted"
-                : isSending
-                  ? "Submitting…"
-                  : "Submit feedback"}
-            </button>
+            {isSignedIn ? (
+              <>
+                <button
+                  type="submit"
+                  disabled={
+                    isDisabled ||
+                    !(draftTitle ?? "").trim() ||
+                    !(draftBody ?? "").trim() ||
+                    streamStatus.isStreaming
+                  }
+                  className={cn(
+                    "w-full px-4 py-2 rounded-md transition-colors",
+                    isSubmitted
+                      ? "bg-muted text-muted-foreground"
+                      : "bg-primary text-primary-foreground hover:bg-primary/90",
+                    "disabled:opacity-50 disabled:cursor-not-allowed",
+                  )}
+                >
+                  {isSubmitted
+                    ? "Submitted"
+                    : isSending
+                      ? "Submitting…"
+                      : "Submit feedback"}
+                </button>
 
-            {isSubmitted && githubIssueUrl && (
-              <a
-                href={githubIssueUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 w-full px-4 py-2 rounded-md border border-border hover:bg-muted/50 transition-colors"
-              >
-                <ExternalLink className="w-4 h-4" />
-                Open GitHub issue
-              </a>
+                {isSubmitted && (
+                  <>
+                    <p className="text-xs text-muted-foreground">
+                      Want this fixed faster? Open a GitHub issue so we can track
+                      it.
+                    </p>
+                    <a
+                      href={githubIssueUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 w-full px-4 py-2 rounded-md border border-border hover:bg-muted/50 transition-colors"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Open GitHub issue
+                    </a>
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  disabled={isDisabled || streamStatus.isStreaming}
+                  onClick={() => setShowAuthModal(true)}
+                  className={cn(
+                    "w-full px-4 py-2 rounded-md transition-colors",
+                    "bg-primary text-primary-foreground hover:bg-primary/90",
+                    "disabled:opacity-50 disabled:cursor-not-allowed",
+                  )}
+                >
+                  Log in to send feedback
+                </button>
+
+                <p className="text-xs text-muted-foreground">
+                  Prefer not to log in? Open a GitHub issue and we’ll track it
+                  there.
+                </p>
+
+                <a
+                  href={githubIssueUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 w-full px-4 py-2 rounded-md border border-border hover:bg-muted/50 transition-colors"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Open GitHub issue
+                </a>
+              </>
             )}
           </div>
         </form>
+
+        {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
       </div>
     );
   },
