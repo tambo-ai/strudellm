@@ -39,6 +39,7 @@ const DEFAULT_CODE = `// Welcome to StrudelLM!
 // Example: Synth line with scope + gain slider, and a pianoroll
 n("0 2 4 7")
   .s("sawtooth")
+  // slider(initial, min, max, step)
   .gain(slider(0.4, 0, 1, 0.01))
   ._scope({ height: 120, scale: 0.5 })
 
