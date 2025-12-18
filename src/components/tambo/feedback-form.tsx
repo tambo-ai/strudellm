@@ -344,7 +344,7 @@ export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
                   there.
                 </p>
 
-                {githubIssueUrl && (
+                {githubIssueUrl ? (
                   <a
                     href={githubIssueUrl}
                     target="_blank"
@@ -354,6 +354,15 @@ export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
                     <ExternalLink className="w-4 h-4" />
                     Open GitHub issue
                   </a>
+                ) : (
+                  <button
+                    type="button"
+                    disabled
+                    className="flex items-center justify-center gap-2 w-full px-4 py-2 rounded-md border border-border text-muted-foreground opacity-60 cursor-not-allowed"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    Open GitHub issue
+                  </button>
                 )}
               </>
             )}
