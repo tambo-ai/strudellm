@@ -1,10 +1,16 @@
 import { cn } from "@/lib/utils";
 import { useStrudel } from "@/strudel/context/strudel-provider";
-import { StrudelService } from "@/strudel/lib/service";
-import { useTamboThread, useTamboThreadInput } from "@tambo-ai/react";
-import { Play, Square, RotateCcw, BotIcon, Info } from "lucide-react";
+import { isSampleErrorMessage } from "@/strudel/lib/errors";
+import {
+  useTamboContextAttachment,
+  useTamboThread,
+  useTamboThreadInput,
+} from "@tambo-ai/react";
+import { Play, Square, RotateCcw, BotIcon, Info, AlertCircle } from "lucide-react";
 import React from "react";
 import { InfoModal } from "@/components/info-modal";
+
+const NOTIFICATION_AUTO_DISMISS_MS = 5000;
 
 /**
  * Categorize the error type for better context
@@ -13,7 +19,8 @@ function categorizeError(error: string | Error): string {
   const errorMsg = typeof error === "string" ? error : error.message;
   const lowerMsg = errorMsg.toLowerCase();
 
-  if (lowerMsg.includes("sample") || lowerMsg.includes("sound not found")) {
+  // Check for sample/sound related errors (e.g., "sound supersquare not found! Is it loaded?")
+  if (isSampleErrorMessage(errorMsg)) {
     return "invalid_sample";
   }
   if (lowerMsg.includes("undefined") || lowerMsg.includes("not a pattern")) {
@@ -29,6 +36,46 @@ function categorizeError(error: string | Error): string {
   return "runtime_error";
 }
 
+type ContextAttachmentApi = ReturnType<typeof useTamboContextAttachment>;
+
+type StrudelErrorAttachmentMetadata = {
+  attachmentKey: string;
+  errorType: string;
+  errorMessage: string | undefined;
+  missingSample: string | null;
+  code: string;
+};
+
+function replaceStrudelErrorContextAttachment(
+  api: Pick<
+    ContextAttachmentApi,
+    "attachments" | "addContextAttachment" | "removeContextAttachment"
+  >,
+  metadata: StrudelErrorAttachmentMetadata,
+): void {
+  const existingErrors = api.attachments.filter(
+    (a) => a.metadata?.kind === "strudel_error",
+  );
+  const alreadyAttached = existingErrors.some(
+    (a) => a.metadata?.attachmentKey === metadata.attachmentKey,
+  );
+
+  if (alreadyAttached) return;
+
+  for (const a of existingErrors) {
+    api.removeContextAttachment(a.id);
+  }
+
+  api.addContextAttachment({
+    name: "Strudel Error",
+    icon: <AlertCircle className="w-3 h-3" />,
+    metadata: {
+      kind: "strudel_error",
+      ...metadata,
+    },
+  });
+}
+
 export function StrudelStatusBar() {
   const [showInfoModal, setShowInfoModal] = React.useState(false);
   const {
@@ -38,76 +85,99 @@ export function StrudelStatusBar() {
     stop,
     reset,
     error,
+    missingSample,
     code,
     hasUnevaluatedChanges,
+    revertNotification,
+    clearRevertNotification,
   } = useStrudel();
-  const { startNewThread, isIdle } = useTamboThread();
-  const { setValue, submit } = useTamboThreadInput();
+  const { startNewThread } = useTamboThread();
+  const { setValue, value } = useTamboThreadInput();
+  const { attachments, addContextAttachment, removeContextAttachment } =
+    useTamboContextAttachment();
 
-  const handleFixError = React.useCallback(async () => {
-    // Don't allow if already processing
-    if (!isIdle) return;
+  // Auto-dismiss revert notification after a delay
+  React.useEffect(() => {
+    if (revertNotification) {
+      const timer = setTimeout(() => {
+        clearRevertNotification();
+      }, NOTIFICATION_AUTO_DISMISS_MS);
+      return () => clearTimeout(timer);
+    }
+  }, [revertNotification, clearRevertNotification]);
 
+  const handleErrorClick = React.useCallback(() => {
     const errorMessage = typeof error === "string" ? error : error?.message;
-    const errorType = error ? categorizeError(error) : "unknown";
+    const errorType = missingSample
+      ? "invalid_sample"
+      : error
+        ? categorizeError(error)
+        : "unknown";
 
-    // Build a detailed message with full context for the AI
-    const contextMessage = `Fix this error in my Strudel code:
+    const attachmentKey = JSON.stringify({ missingSample, errorMessage, code });
+    replaceStrudelErrorContextAttachment(
+      { attachments, addContextAttachment, removeContextAttachment },
+      {
+        attachmentKey,
+        errorType,
+        errorMessage,
+        missingSample,
+        code,
+      },
+    );
 
-**Error Type:** ${errorType}
-**Error Message:** ${errorMessage}
-
-**Current Code:**
-\`\`\`javascript
-${code}
-\`\`\`
-
-Please fix the error and update the REPL with corrected code.`;
-
-    const sendFixRequest = async () => {
-      setValue(contextMessage);
-      await submit({
-        streamResponse: true,
-      });
-    };
-
-    try {
-      // Clear the error immediately when user requests a fix
-      StrudelService.instance().clearError();
-      await sendFixRequest();
-    } catch (err) {
-      console.error("Failed to send fix error message:", err);
-      // Check for thread-related errors more specifically
-      // Look for specific thread error patterns to avoid false positives
-      const errStr = String(err);
-      const isThreadError =
-        errStr.includes("thread not found") ||
-        errStr.includes("invalid thread") ||
-        errStr.includes("Thread does not exist") ||
-        (errStr.includes("thread") && errStr.includes("error"));
-
-      if (isThreadError) {
-        try {
-          await startNewThread();
-          await sendFixRequest();
-        } catch (newThreadErr) {
-          console.error("Failed to create new thread:", newThreadErr);
-        }
+    // If input is empty, add default message
+    if (!value?.trim()) {
+      if (missingSample) {
+        setValue(`Find a new sample to replace "${missingSample}".`);
+      } else {
+        setValue("Help me fix this issue, and explain what I did wrong.");
       }
     }
-  }, [error, code, isIdle, setValue, submit, startNewThread]);
+
+  }, [
+    addContextAttachment,
+    attachments,
+    code,
+    error,
+    missingSample,
+    removeContextAttachment,
+    setValue,
+    value,
+  ]);
 
   return (
     <>
-      {error && (
-        <div className="px-3 py-2 text-destructive border-t border-destructive/30">
-          <div className="w-full">
-            <button className="" onClick={handleFixError}>
-              <BotIcon /> Fix Error
-            </button>
-          </div>
-          <div>{typeof error === "string" ? error : error.message}</div>
+      {/* Revert notification - shown when AI code fails and we revert */}
+      {revertNotification && (
+        <div className="px-3 py-2 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-t border-amber-500/30 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          <span className="text-sm">{revertNotification.message}</span>
+          <button
+            onClick={clearRevertNotification}
+            className="ml-auto text-xs opacity-60 hover:opacity-100"
+          >
+            dismiss
+          </button>
         </div>
+      )}
+      {error && (
+        <button
+          onClick={handleErrorClick}
+          className="w-full px-3 py-2 text-destructive border-t border-destructive/30 hover:bg-destructive/5 transition-colors cursor-pointer text-left"
+        >
+          <div className="flex items-center gap-2 text-sm font-medium mb-1">
+            <BotIcon className="w-4 h-4" />
+            <span>
+              {missingSample
+                ? `Sound "${missingSample}" is missing. Click to find a new sample.`
+                : "Click to get help fixing this error"}
+            </span>
+          </div>
+          <div className="text-xs opacity-80 truncate">
+            {typeof error === "string" ? error : error.message}
+          </div>
+        </button>
       )}
       <div className="px-3 py-1.5 border-t border-border text-muted-foreground flex items-center justify-between">
         <div className="flex items-center gap-3">

@@ -13,6 +13,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   useIsTamboTokenUpdating,
+  useTamboContextAttachment,
   useTamboThread,
   useTamboThreadInput,
   type StagedImage,
@@ -191,6 +192,7 @@ const MessageInputInternal = React.forwardRef<
     clearImages,
   } = useTamboThreadInput();
   const { cancel } = useTamboThread();
+  const { clearContextAttachments } = useTamboContextAttachment();
   const [displayValue, setDisplayValue] = React.useState("");
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -228,6 +230,8 @@ const MessageInputInternal = React.forwardRef<
           streamResponse: true,
         });
         setValue("");
+        // Clear context attachments after successful submit
+        clearContextAttachments();
         // Images are cleared automatically by the TamboThreadInputProvider
         setTimeout(() => {
           textareaRef.current?.focus();
@@ -263,6 +267,7 @@ const MessageInputInternal = React.forwardRef<
       isSubmitting,
       images,
       clearImages,
+      clearContextAttachments,
     ],
   );
 
@@ -397,6 +402,7 @@ const MessageInputInternal = React.forwardRef<
             />
           ) : (
             <>
+              <MessageInputContextAttachments />
               <MessageInputStagedImages />
               {children}
             </>
@@ -1090,6 +1096,60 @@ const MessageInputStagedImages = React.forwardRef<
 MessageInputStagedImages.displayName = "MessageInput.StagedImages";
 
 /**
+ * Props for the MessageInputContextAttachments component.
+ */
+export type MessageInputContextAttachmentsProps =
+  React.HTMLAttributes<HTMLDivElement>;
+
+/**
+ * Component that displays context attachments as removable badges.
+ * @component MessageInput.ContextAttachments
+ */
+const MessageInputContextAttachments = React.forwardRef<
+  HTMLDivElement,
+  MessageInputContextAttachmentsProps
+>(({ className, ...props }, ref) => {
+  const { attachments, removeContextAttachment } = useTamboContextAttachment();
+
+  if (attachments.length === 0) {
+    return null;
+  }
+
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        "flex flex-wrap items-center gap-2 pb-2 pt-1 border-b border-border",
+        className,
+      )}
+      data-slot="message-input-context-attachments"
+      {...props}
+    >
+      {attachments.map((attachment) => (
+        <div
+          key={attachment.id}
+          className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 text-sm border border-amber-500/30"
+        >
+          {attachment.icon && (
+            <span className="flex-shrink-0">{attachment.icon}</span>
+          )}
+          <span className="truncate max-w-[150px]">{attachment.name}</span>
+          <button
+            type="button"
+            onClick={() => removeContextAttachment(attachment.id)}
+            className="ml-1 hover:text-amber-900 dark:hover:text-amber-200 transition-colors"
+            aria-label={`Remove ${attachment.name}`}
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+});
+MessageInputContextAttachments.displayName = "MessageInput.ContextAttachments";
+
+/**
  * Container for the toolbar components (like submit button and MCP config button).
  * Provides correct spacing and alignment.
  * @component MessageInput.Toolbar
@@ -1151,6 +1211,7 @@ MessageInputToolbar.displayName = "MessageInput.Toolbar";
 export {
   DictationButton,
   MessageInput,
+  MessageInputContextAttachments,
   MessageInputError,
   MessageInputFileButton,
   MessageInputMcpConfigButton,

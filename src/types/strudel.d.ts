@@ -126,6 +126,10 @@ declare module "@strudel/codemirror" {
     pattern?: unknown;
     evalError: Error | string | undefined;
     schedulerError: Error | string | undefined;
+    /** Optional name of a missing sample/sound parsed from scheduler errors */
+    missingSample?: string | null;
+    /** Optional notification shown when updates revert to a previous pattern */
+    revertNotification?: { id: number; message: string } | null;
   }
 
   export interface StrudelMirrorOptions {

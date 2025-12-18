@@ -23,7 +23,8 @@ import {
   StrudelMirrorOptions,
   StrudelReplState,
 } from "@strudel/codemirror";
-import { getDrawContext } from "@strudel/draw";
+import { getDrawContext, setTheme } from "@strudel/draw";
+import { isSampleErrorMessage as matchesSampleErrorMessage } from "@/strudel/lib/errors";
 import type {
   StrudelStorageAdapter,
   ReplSummary,
@@ -32,6 +33,8 @@ import { DEFAULT_KEYBINDINGS, getKeybindings } from "@/lib/editor-preferences";
 
 type LoadingCallback = (status: string, progress: number) => void;
 type CodeChangeCallback = (state: StrudelReplState) => void;
+
+type UpdateSource = "ai" | "user";
 
 const DEFAULT_CODE = `// Welcome to StrudelLM!
 // Write patterns here or ask the AI for help
@@ -68,7 +71,19 @@ export class StrudelService {
   private _state: StrudelReplState = {
     code: DEFAULT_CODE,
     started: false,
+    missingSample: null,
+    revertNotification: null,
   } as StrudelReplState;
+  // Global handlers for async scheduler errors
+  private unhandledRejectionHandler: ((
+    event: PromiseRejectionEvent,
+  ) => void) | null = null;
+  private errorHandler: ((event: ErrorEvent) => void) | null = null;
+  private originalConsoleError: ((...data: unknown[]) => void) | null = null;
+
+  private revertNotificationId = 0;
+  private updateOperationId = 0;
+  private pendingSchedulerWaitCancel: (() => void) | null = null;
 
   // Thread/REPL persistence state
   private currentThreadId: string | null = null;
@@ -154,6 +169,13 @@ export class StrudelService {
   get isPlaying(): boolean {
     return this.editorInstance?.repl.scheduler.started || false;
   }
+
+  /**
+   * Clear the revert notification
+   */
+  clearRevertNotification = (): void => {
+    this.notifyStateChange({ revertNotification: null });
+  };
 
   // ============================================
   // Code Persistence (REPL/Thread Model)
@@ -432,9 +454,39 @@ export class StrudelService {
     };
   };
 
-  private notifyStateChange(state: StrudelReplState): void {
-    this._state = state;
-    this.stateChangeCallbacks.forEach((cb) => cb(state));
+  private notifyStateChange(state: Partial<StrudelReplState>): void {
+    const hasEvalError = Object.prototype.hasOwnProperty.call(state, "evalError");
+    const hasSchedulerError = Object.prototype.hasOwnProperty.call(
+      state,
+      "schedulerError",
+    );
+    const hasMissingSample = Object.prototype.hasOwnProperty.call(
+      state,
+      "missingSample",
+    );
+    const hasRevertNotification = Object.prototype.hasOwnProperty.call(
+      state,
+      "revertNotification",
+    );
+
+    const mergedState: StrudelReplState = {
+      ...this._state,
+      ...state,
+      // Preserve existing errors/missingSample unless new values are provided
+      evalError: hasEvalError ? state.evalError : this._state.evalError,
+      schedulerError: hasSchedulerError
+        ? state.schedulerError
+        : this._state.schedulerError,
+      missingSample: hasMissingSample
+        ? state.missingSample
+        : this._state.missingSample,
+      revertNotification: hasRevertNotification
+        ? state.revertNotification
+        : this._state.revertNotification,
+    };
+
+    this._state = mergedState;
+    this.stateChangeCallbacks.forEach((cb) => cb(mergedState));
 
     // Auto-save on code change (skip during initialization)
     if (!this.isInitializing) {
@@ -480,7 +532,7 @@ export class StrudelService {
     }
   }
 
-  // Editor runtime restart (for keybindings)
+// Editor runtime restart (for keybindings)
 
   /**
    * Restart the editor runtime.
@@ -543,6 +595,190 @@ export class StrudelService {
     } finally {
       this.isRestartingEditor = false;
     }
+  }
+
+  /**
+   * Normalize scheduler/runtime errors so they flow through the same path
+   */
+  private captureSchedulerError = (error: unknown): void => {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const normalizedMessage = errorMessage || "Unknown error";
+
+    const isSampleError = this.isSampleErrorMessage(normalizedMessage);
+    const isAudioWorkletError = this.isAudioWorkletErrorMessage(normalizedMessage);
+
+    // TODO: Some missing-sample errors still escape this path; investigate deeper Strudel scheduler/getTrigger flows.
+    const normalizedError = isSampleError
+      ? new Error(`Sample error: ${normalizedMessage}`)
+      : isAudioWorkletError
+        ? new Error(`Audio engine error: ${normalizedMessage}`)
+        : error instanceof Error
+          ? error
+          : new Error(normalizedMessage);
+
+    const missingSample = isSampleError
+      ? this.extractMissingSampleName(normalizedMessage)
+      : null;
+
+    this.notifyStateChange({
+      schedulerError: normalizedError,
+      missingSample,
+    });
+  };
+
+  private isSampleErrorMessage(message: string): boolean {
+    return matchesSampleErrorMessage(message);
+  }
+
+  private isAudioWorkletErrorMessage(message: string): boolean {
+    const lowerMessage = message.toLowerCase();
+    return (
+      lowerMessage.includes("audioworklet") ||
+      lowerMessage.includes("audio worklet") ||
+      lowerMessage.includes("workletnode") ||
+      lowerMessage.includes("worklet node")
+    );
+  }
+
+  private extractMissingSampleName(message: string): string | null {
+    // Common formats:
+    // "sound supersquare not found! Is it loaded?"
+    // "sample foo not found"
+    const match =
+      /(?:sound|sample)\s+([a-zA-Z0-9-_]+)/i.exec(message) ||
+      /"([^"]+)"\s+not\s+found/i.exec(message);
+
+    if (match?.[1]) {
+      return match[1];
+    }
+    return null;
+  }
+
+  private isResourceErrorMessage(message: string): boolean {
+    return (
+      this.isSampleErrorMessage(message) || this.isAudioWorkletErrorMessage(message)
+    );
+  }
+
+  /**
+   * Capture async Strudel scheduler promise rejections (e.g., missing samples)
+   * and global errors that bypass evaluate/play try-catch flows.
+   */
+  private registerGlobalErrorHandlers(): void {
+    if (typeof window === "undefined") return;
+
+    if (!this.unhandledRejectionHandler) {
+      this.unhandledRejectionHandler = (event: PromiseRejectionEvent) => {
+        const { reason } = event;
+        const message =
+          reason instanceof Error
+            ? reason.message
+            : typeof reason === "string"
+              ? reason
+              : "";
+
+        const shouldHandle = !!message && this.isResourceErrorMessage(message);
+
+        if (shouldHandle) {
+          this.captureSchedulerError(reason);
+        }
+      };
+
+      window.addEventListener("unhandledrejection", this.unhandledRejectionHandler, {
+        capture: true,
+      });
+    }
+
+    if (!this.errorHandler) {
+      this.errorHandler = (event: ErrorEvent) => {
+        const message = event.message || (event.error?.message ?? "");
+        const shouldHandle = this.isResourceErrorMessage(message);
+
+        if (shouldHandle) {
+          this.captureSchedulerError(event.error || message);
+        }
+      };
+
+      window.addEventListener("error", this.errorHandler, { capture: true });
+    }
+  }
+
+  private unregisterGlobalErrorHandlers(): void {
+    if (typeof window === "undefined") return;
+
+    if (this.unhandledRejectionHandler) {
+      window.removeEventListener("unhandledrejection", this.unhandledRejectionHandler, {
+        capture: true,
+      });
+      this.unhandledRejectionHandler = null;
+    }
+
+    if (this.errorHandler) {
+      window.removeEventListener("error", this.errorHandler, { capture: true });
+      this.errorHandler = null;
+    }
+  }
+
+  /**
+   * Strudel's internal errorLogger uses console.error in development.
+   * Filter out sample-not-found noise while keeping other errors visible.
+   */
+  private installConsoleErrorFilter(): void {
+    if (process.env.NODE_ENV !== "development") return;
+    if (this.originalConsoleError || typeof console === "undefined") return;
+
+    this.originalConsoleError = console.error;
+    console.error = (...args: unknown[]) => {
+      const joinedMessage = args
+        .map((arg) => {
+          if (arg instanceof Error) return arg.message;
+          if (typeof arg === "string") return arg;
+          return "";
+        })
+        .join(" ");
+
+      if (joinedMessage && this.isResourceErrorMessage(joinedMessage)) {
+        return; // swallow sample/audio engine noise
+      }
+
+      this.originalConsoleError?.(...args);
+    };
+  }
+
+  private removeConsoleErrorFilter(): void {
+    if (this.originalConsoleError) {
+      console.error = this.originalConsoleError;
+      this.originalConsoleError = null;
+    }
+  }
+
+  fixTheme(): void {
+    const themeSettings = {
+      background: "var(--card-background)",
+      foreground: "var(--card-foreground)",
+      caret: "var(--muted-foreground)",
+      selection: "color-mix(in oklch, var(--primary) 20%, transparent)",
+      selectionMatch: "color-mix(in oklch, var(--primary) 20%, transparent)",
+      lineHighlight: "color-mix(in oklch, var(--primary) 20%, transparent)",
+      lineBackground:
+        "color-mix(in oklch, var(--card-foreground) 20%, transparent)",
+      gutterBackground: "transparent",
+      gutterForeground: "var(--muted-foreground)",
+    };
+    const styleID = "strudel-theme-vars";
+    let styleEl = document.getElementById(styleID) as HTMLStyleElement | null;
+    if (!styleEl) {
+      styleEl = document.createElement("style");
+      styleEl.id = styleID;
+      document.head.appendChild(styleEl);
+    }
+    styleEl.innerHTML = `:root .cm-editor {
+      ${Object.entries(themeSettings)
+        // important to override fallback
+        .map(([key, value]) => `--${key}: ${value};`)
+        .join("\n")}
+    }`;
+    setTheme(themeSettings);
   }
 
   prebake = async (): Promise<void> => {
@@ -646,26 +882,12 @@ export class StrudelService {
         onError: (error: Error) => {
           // Capture runtime errors (including sample not found errors)
           // and propagate them through state
-          const errorMessage = error.message || String(error);
-
-          // Check if it's a sample-related error
-          const isSampleError =
-            errorMessage.toLowerCase().includes("sample") ||
-            errorMessage.toLowerCase().includes("sound") ||
-            errorMessage.toLowerCase().includes("not found");
-
-          this._state = {
-            ...this._state,
-            schedulerError: isSampleError
-              ? new Error(`Sample error: ${errorMessage}`)
-              : error,
-          };
-          this.notifyStateChange(this._state);
+          this.captureSchedulerError(error);
         },
         prebake: this.prebake,
       });
 
-      const keybindings = getKeybindings();
+const keybindings = getKeybindings();
       const resolvedKeybindings =
         keybindings &&
         (ALLOWED_KEYBINDINGS as readonly string[]).includes(keybindings)
@@ -675,7 +897,6 @@ export class StrudelService {
       if (typeof this.editorInstance.changeSetting === "function") {
         this.editorInstance.changeSetting("keybindings", resolvedKeybindings);
       }
-
       await this.prebake();
 
       if (oldEditor) {
@@ -705,6 +926,10 @@ export class StrudelService {
    * Detach the editor from its container
    */
   detach(): void {
+    this.pendingSchedulerWaitCancel?.();
+    this.unregisterGlobalErrorHandlers();
+    this.removeConsoleErrorFilter();
+
     if (this.editorInstance) {
       this.editorInstance.dispose?.();
       this.editorInstance = null;
@@ -728,11 +953,26 @@ export class StrudelService {
   // ============================================
 
   play = async (): Promise<void> => {
-    return await this.editorInstance?.evaluate();
+    this.registerGlobalErrorHandlers();
+    this.installConsoleErrorFilter();
+    try {
+      return await this.editorInstance?.evaluate();
+    } catch (error) {
+      // Capture runtime errors (like "sound X not found") that are thrown
+      // during evaluate. The onError callback should also capture these,
+      // but we catch here to prevent unhandled rejections.
+      this.captureSchedulerError(error);
+      this.unregisterGlobalErrorHandlers();
+      this.removeConsoleErrorFilter();
+      throw error;
+    }
   };
 
   stop = (): void => {
     this.editorInstance?.repl.stop();
+    this.pendingSchedulerWaitCancel?.();
+    this.unregisterGlobalErrorHandlers();
+    this.removeConsoleErrorFilter();
   };
 
   evaluate = async (code: string, play: boolean = false): Promise<void> => {
@@ -745,41 +985,180 @@ export class StrudelService {
   };
 
   /**
-   * Update the editor with new code and optionally play it
+   * Wait for potential scheduler errors that occur asynchronously
+   * after evaluate() returns but before audio actually plays.
+   * Returns the error if one occurs within the timeout, or null.
+   */
+  private waitForSchedulerError = (
+    operationId: number,
+    timeoutMs: number = 500,
+  ): Promise<Error | string | null> => {
+    return new Promise((resolve) => {
+      let resolved = false;
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+      let unsubscribe = () => {};
+
+      const cancel = () => {
+        if (resolved) return;
+        resolved = true;
+        unsubscribe();
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+        if (this.pendingSchedulerWaitCancel === cancel) {
+          this.pendingSchedulerWaitCancel = null;
+        }
+        resolve(null);
+      };
+
+      // Set up a one-time listener for state changes
+      unsubscribe = this.onStateChange((state) => {
+        if (operationId !== this.updateOperationId) {
+          cancel();
+          return;
+        }
+
+        if (!resolved && state.schedulerError) {
+          resolved = true;
+          unsubscribe();
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
+          if (this.pendingSchedulerWaitCancel === cancel) {
+            this.pendingSchedulerWaitCancel = null;
+          }
+          resolve(state.schedulerError);
+        }
+      });
+
+      // After timeout, resolve with null (no error) or current error
+      timeoutId = setTimeout(() => {
+        if (operationId !== this.updateOperationId) {
+          cancel();
+          return;
+        }
+
+        if (!resolved) {
+          resolved = true;
+          unsubscribe();
+          if (this.pendingSchedulerWaitCancel === cancel) {
+            this.pendingSchedulerWaitCancel = null;
+          }
+          // Check one more time for any error that might have been set
+          resolve(this._state.schedulerError ?? null);
+        }
+      }, timeoutMs);
+
+      this.pendingSchedulerWaitCancel?.();
+      this.pendingSchedulerWaitCancel = cancel;
+    });
+  };
+
+  /**
+   * Update the editor with new code and play it
    * Used by external tools (like AI-generated updates)
    *
    * Validates that the code evaluates to a valid Strudel pattern
-   * before applying and playing it.
+   * before applying and playing it. If the code fails, reverts to
+   * the previous working code and restarts playback if it was playing.
    */
-  updateAndPlay = async (code: string) => {
+  updateAndPlay = async (
+    code: string,
+    options?: {
+      source?: UpdateSource;
+    },
+  ) => {
+    const source = options?.source ?? "user";
+
+    this.updateOperationId += 1;
+    const operationId = this.updateOperationId;
+
+    // Save current state before attempting update
+    const previousCode = this.getCode();
+    const wasPlaying = this.isPlaying;
+
     try {
-      await this.setCode(code);
+      // Stop playback first to avoid partial broken state
+      if (wasPlaying) {
+        this.stop();
+      }
+
+      // Clear any previous errors
+      this.clearError();
+
+      // Set the new code
+      this.setCode(code);
+
+      // Try to evaluate/play the new code
       await this.play();
 
-      // Check if there was an evaluation error after play
+      if (operationId !== this.updateOperationId) {
+        return { success: false, error: "Update superseded by a newer update." };
+      }
+
+      // Check if there was an immediate evaluation error
       const state = this.getReplState();
       if (state.evalError) {
         const errorMsg =
           typeof state.evalError === "string"
             ? state.evalError
             : state.evalError.message || String(state.evalError);
+
+        // Revert to previous working code
+        if (operationId === this.updateOperationId) {
+          await this.revertToCode(previousCode, wasPlaying, source);
+        }
+
         return {
           success: false,
           error: `Evaluation error: ${errorMsg}\n\nCode:\n${code}`,
         };
       }
 
+      // Wait for potential async scheduler errors (like "sound X not found")
+      // These happen when the scheduler starts playing and discovers missing samples
+      const schedulerError = await this.waitForSchedulerError(operationId, 500);
+
+      if (operationId !== this.updateOperationId) {
+        return { success: false, error: "Update superseded by a newer update." };
+      }
+      if (schedulerError) {
+        const errorMsg =
+          typeof schedulerError === "string"
+            ? schedulerError
+            : schedulerError.message || String(schedulerError);
+
+        // Revert to previous working code
+        if (operationId === this.updateOperationId) {
+          await this.revertToCode(previousCode, wasPlaying, source);
+        }
+
+        return {
+          success: false,
+          error: `Runtime error: ${errorMsg}\n\nCode:\n${code}`,
+        };
+      }
+
+      // Re-check state after waiting for scheduler errors
+      const finalState = this.getReplState();
+
       // Check if the pattern is undefined (code didn't return a valid pattern)
       // This happens when code like `console.log("hello")` is executed
       const hasPatternField = Object.prototype.hasOwnProperty.call(
-        state,
+        finalState,
         "pattern",
       );
       if (
         hasPatternField &&
-        state.pattern === undefined &&
-        state.activeCode === code
+        finalState.pattern === undefined &&
+        finalState.activeCode === code
       ) {
+        // Revert to previous working code
+        if (operationId === this.updateOperationId) {
+          await this.revertToCode(previousCode, wasPlaying, source);
+        }
+
         return {
           success: false,
           error: `Code must return a valid Strudel pattern. Got 'undefined' instead. Make sure your code ends with a pattern expression like s("bd sd") or note("c3 e3 g3").\n\nCode:\n${code}`,
@@ -788,7 +1167,56 @@ export class StrudelService {
 
       return { success: true, code };
     } catch (error) {
+      // On any error, revert to previous working code
+      if (operationId === this.updateOperationId) {
+        await this.revertToCode(previousCode, wasPlaying, source);
+      } else {
+        console.warn(
+          "[StrudelService] updateAndPlay: superseded operation error:",
+          error,
+        );
+      }
+
       return { success: false, error: (error as Error).message };
+    }
+  };
+
+  /**
+   * Revert to a previous code state and optionally restart playback
+   * Used internally by updateAndPlay when new code fails
+   */
+  private revertToCode = async (
+    code: string,
+    restartPlayback: boolean,
+    source: UpdateSource,
+  ): Promise<void> => {
+    // Stop any current playback
+    this.stop();
+
+    // Clear errors from the failed attempt
+    this.clearError();
+
+    if (source === "ai") {
+      this.revertNotificationId += 1;
+      this.notifyStateChange({
+        revertNotification: {
+          id: this.revertNotificationId,
+          message: "That update didn't play. Reverted to the last working pattern.",
+        },
+      });
+    }
+
+    // Restore the previous code
+    this.setCode(code);
+
+    // Restart playback if it was playing before
+    if (restartPlayback) {
+      try {
+        await this.play();
+      } catch {
+        // If restart fails, just leave it stopped
+        console.warn("[StrudelService] Failed to restart playback after revert");
+      }
     }
   };
 
@@ -801,6 +1229,7 @@ export class StrudelService {
       ...this._state,
       evalError: undefined,
       schedulerError: undefined,
+      missingSample: null,
     };
     this.notifyStateChange(this._state);
   };
@@ -824,6 +1253,8 @@ export class StrudelService {
   dispose(): void {
     this.stop();
     this.detach();
+    this.unregisterGlobalErrorHandlers();
+    this.removeConsoleErrorFilter();
 
     this.loadingCallbacks = [];
     this.stateChangeCallbacks = [];

@@ -158,7 +158,7 @@ async function validateSamples(
 export const validateAndUpdateRepl: TamboTool = {
   name: "updateRepl",
   description:
-    "Update the Strudel REPL with new pattern code. The code is validated by running it through Strudel's evaluator first. If the code is invalid, the tool will fail with the exact error message from the evaluator. Fix the error and try again. Make sure the code and sequences are in the same key/scale and don't produce anything that will sound dissonant.",
+    "Update the Strudel REPL with new pattern code. The code is validated by running it through Strudel's evaluator first. IMPORTANT: If success is false, you MUST immediately call this tool again with corrected code that fixes the error - do not ask the user or wait. The error message tells you exactly what went wrong. Common fixes: use listSamples to find valid sample names, fix syntax errors, ensure patterns return valid Strudel expressions. Make sure the code and sequences are in the same key/scale and don't produce anything that will sound dissonant.",
   tool: async (
     code: string,
   ): Promise<{ success: boolean; code?: string; error?: string }> => {
@@ -188,7 +188,7 @@ export const validateAndUpdateRepl: TamboTool = {
       }
     }
 
-    const result = await service.updateAndPlay(code);
+    const result = await service.updateAndPlay(code, { source: "ai" });
 
     return result;
   },
