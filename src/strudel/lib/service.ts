@@ -37,10 +37,11 @@ const DEFAULT_CODE = `// Welcome to StrudelLM!
 // Write patterns here or ask the AI for help
 
 // Example: Synth line with scope + gain slider, and a pianoroll
+// slider(initial, min, max, step)
+const gain = typeof slider === "function" ? slider(0.4, 0, 1, 0.01) : 0.4;
 n("0 2 4 7")
   .s("sawtooth")
-  // slider(initial, min, max, step)
-  .gain(slider(0.4, 0, 1, 0.01))
+  .gain(gain)
   ._scope({ height: 120, scale: 0.5 })
 
 // Add a pianoroll visualization on a simple pattern
