@@ -38,8 +38,14 @@ export async function POST(req: Request) {
       console.error("Failed to fetch auth session for feedback", error);
     }
     return NextResponse.json(
-      { ok: false, error: "Auth service unavailable", code: "AUTH_SESSION_ERROR" },
-      { status: 500 },
+      {
+        ok: false,
+        error: "Auth temporarily unavailable",
+        code: "AUTH_UNAVAILABLE",
+        message:
+          "We can't verify your account right now. Please try again later or open a GitHub issue instead.",
+      },
+      { status: 503 },
     );
   }
 

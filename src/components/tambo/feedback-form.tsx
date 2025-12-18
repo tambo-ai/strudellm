@@ -161,6 +161,15 @@ export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
             if (
               data &&
               typeof data === "object" &&
+              "message" in data &&
+              typeof (data as { message?: unknown }).message === "string"
+            ) {
+              throw new Error((data as { message: string }).message);
+            }
+
+            if (
+              data &&
+              typeof data === "object" &&
               "error" in data &&
               typeof (data as { error?: unknown }).error === "string"
             ) {
