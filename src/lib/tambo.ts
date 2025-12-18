@@ -42,7 +42,7 @@ export const components: TamboComponent[] = [
   {
     name: "FeedbackForm",
     description:
-      "Render this when the user is unhappy, frustrated, or asking for something the app does not support (bug reports, missing features, ‘this doesn’t work’, ‘I can’t do X’, etc.). Use it as the assistant response to collect actionable feedback. Fill `title` (5–10 words) and `body` (a short paragraph describing what they tried, expected, and what happened). If the user is signed in, submitting sends a support email; if they’re signed out, they’ll be prompted to log in and can instead open a pre-filled GitHub issue.",
+      "Render this when the user is unhappy, frustrated, or asking for something the app does not support (bug reports, missing features, ‘this doesn’t work’, ‘I can’t do X’, etc.). Use it as the assistant response to collect actionable feedback. Fill `title` (5–10 words) and `body` (a short paragraph describing what they tried, expected, and what happened). If the user is signed in, submitting sends a support email; if they’re signed out, they’ll be prompted to log in and can instead open a pre-filled GitHub issue (requires at least ~10 characters of detail).",
     component: FeedbackForm,
     propsSchema: feedbackFormSchema,
   },

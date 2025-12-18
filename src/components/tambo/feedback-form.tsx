@@ -355,14 +355,20 @@ export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
                     Open GitHub issue
                   </a>
                 ) : (
-                  <button
-                    type="button"
-                    disabled
-                    className="flex items-center justify-center gap-2 w-full px-4 py-2 rounded-md border border-border text-muted-foreground opacity-60 cursor-not-allowed"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    Open GitHub issue
-                  </button>
+                  <div className="space-y-1">
+                    <button
+                      type="button"
+                      disabled
+                      className="flex items-center justify-center gap-2 w-full px-4 py-2 rounded-md border border-border text-muted-foreground opacity-60 cursor-not-allowed"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Open GitHub issue
+                    </button>
+                    <p className="text-xs text-muted-foreground">
+                      Add a bit more detail above to enable opening a GitHub
+                      issue.
+                    </p>
+                  </div>
                 )}
               </>
             )}
