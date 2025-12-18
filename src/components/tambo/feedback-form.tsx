@@ -90,6 +90,8 @@ export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
       const cleanedTitle = (draftTitle ?? "").trim();
       const cleanedBody = (draftBody ?? "").trim();
 
+      if (!cleanedTitle && !cleanedBody) return null;
+
       const params = new URLSearchParams();
       params.set("title", cleanedTitle || "Feedback from StrudelLM");
       params.set(
@@ -265,7 +267,7 @@ export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
                       : "Submit feedback"}
                 </button>
 
-                {isSubmitted && (
+                {isSubmitted && githubIssueUrl && (
                   <>
                     <p className="text-xs text-muted-foreground">
                       Want this fixed faster? Open a GitHub issue so we can track
@@ -287,7 +289,7 @@ export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
               <>
                 <button
                   type="button"
-                  disabled={isDisabled || streamStatus.isStreaming}
+                  disabled={isSending || streamStatus.isStreaming}
                   onClick={() => setShowAuthModal(true)}
                   className={cn(
                     "w-full px-4 py-2 rounded-md transition-colors",
@@ -303,15 +305,17 @@ export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
                   there.
                 </p>
 
-                <a
-                  href={githubIssueUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 w-full px-4 py-2 rounded-md border border-border hover:bg-muted/50 transition-colors"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  Open GitHub issue
-                </a>
+                {githubIssueUrl && (
+                  <a
+                    href={githubIssueUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 w-full px-4 py-2 rounded-md border border-border hover:bg-muted/50 transition-colors"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    Open GitHub issue
+                  </a>
+                )}
               </>
             )}
           </div>
