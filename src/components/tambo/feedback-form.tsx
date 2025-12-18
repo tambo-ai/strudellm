@@ -87,12 +87,15 @@ export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
     ]);
 
     const githubIssueUrl = React.useMemo(() => {
+      const cleanedTitle = (draftTitle ?? "").trim();
+      const cleanedBody = (draftBody ?? "").trim();
+
       const params = new URLSearchParams();
-      params.set("title", (draftTitle ?? "").trim());
+      params.set("title", cleanedTitle || "Feedback from StrudelLM");
       params.set(
         "body",
         buildGithubIssueBody({
-          body: draftBody ?? "",
+          body: cleanedBody,
         }),
       );
 

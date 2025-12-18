@@ -28,7 +28,13 @@ export async function POST(req: Request) {
 
   if (!session?.user?.email) {
     return NextResponse.json(
-      { ok: false, error: "Sign in required" },
+      {
+        ok: false,
+        error: "Sign in required",
+        code: "AUTH_REQUIRED_FOR_FEEDBACK",
+        message:
+          "You must be signed in to send feedback via email. Please sign in or open a GitHub issue.",
+      },
       { status: 401 },
     );
   }
@@ -53,6 +59,9 @@ export async function POST(req: Request) {
 
   const { title, body } = parsed.data;
   const userEmail = session.user.email;
+  const safeReplyTo = z.string().email().safeParse(userEmail).success
+    ? userEmail
+    : undefined;
 
   // In development (and in production without RESEND_API_KEY), log feedback rather than fail hard.
   // This keeps local dev usable without requiring email credentials.
@@ -98,7 +107,7 @@ export async function POST(req: Request) {
       to,
       subject,
       html,
-      replyTo: userEmail,
+      replyTo: safeReplyTo,
     });
     return NextResponse.json({ ok: true, delivered: true });
   } catch (error) {
