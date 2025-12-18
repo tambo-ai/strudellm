@@ -507,6 +507,25 @@ Maps Strudel's internal CSS variables to our theme variables
 }
 
 /* Landing page animations */
+
+/* Visualization canvases: ensure contrast across themes */
+canvas[id*="_widget__scope_"],
+canvas[id*="_widget__pianoroll_"] {
+    background: #0b0f1a;
+    border: 1px solid color-mix(in oklch, white 20%, transparent);
+    border-radius: 8px;
+}
+
+[data-theme="github-light"] canvas[id*="_widget__scope_"],
+[data-theme="solarized-light"] canvas[id*="_widget__scope_"],
+[data-theme="one-light"] canvas[id*="_widget__scope_"],
+[data-theme="github-light"] canvas[id*="_widget__pianoroll_"],
+[data-theme="solarized-light"] canvas[id*="_widget__pianoroll_"],
+[data-theme="one-light"] canvas[id*="_widget__pianoroll_"] {
+    background: #0b0f1a; /* keep dark so the white stroke stays visible */
+    border-color: color-mix(in oklch, black 25%, transparent);
+}
+
 @keyframes landing-float {
     0%,
     100% {
