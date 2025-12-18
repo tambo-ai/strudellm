@@ -15,14 +15,14 @@ export const feedbackFormSchema = z.object({
     .min(3)
     .max(80)
     .describe(
-      "A short feedback title (aim for 5–10 words) describing the user’s problem or request.",
+      "A short feedback title (aim for 5–10 words) describing the user’s problem or request. Used for either the support email subject (when signed in) or the GitHub issue title (when signed out).",
     ),
   body: z
     .string()
     .min(10)
     .max(4000)
     .describe(
-      "A longer description of what the user is trying to do, what they expected, and what happened instead.",
+      "A longer description of what the user is trying to do, what they expected, and what happened instead. Used for either the support email body (when signed in) or the GitHub issue body (when signed out).",
     ),
 });
 

@@ -64,7 +64,8 @@ export async function POST(req: Request) {
     console.warn("Authenticated user has invalid email in session", { userEmail });
   }
 
-  const safeReplyTo = userEmailParse.success ? userEmailParse.data : undefined;
+  const safeUserEmail = userEmailParse.success ? userEmailParse.data : undefined;
+  const safeReplyTo = safeUserEmail;
 
   // In development (and in production without RESEND_API_KEY), log feedback rather than fail hard.
   // This keeps local dev usable without requiring email credentials.
@@ -78,7 +79,9 @@ export async function POST(req: Request) {
       );
     }
 
-    const redactedUserEmail = userEmail.replace(/(^.).*(@.*$)/, "$1***$2");
+    const redactedUserEmail = safeUserEmail
+      ? safeUserEmail.replace(/(^.).*(@.*$)/, "$1***$2")
+      : "(invalid or missing)";
 
     console.log("[feedback]", {
       title,
@@ -102,7 +105,7 @@ export async function POST(req: Request) {
       <h2>${escapeHtml(title)}</h2>
       <p style="white-space: pre-wrap;">${escapeHtml(body)}</p>
       <hr />
-      <p><strong>User email:</strong> ${escapeHtml(userEmail)}</p>
+      <p><strong>User email:</strong> ${escapeHtml(safeUserEmail ?? "(invalid or missing)")}</p>
     </div>
   `;
 
