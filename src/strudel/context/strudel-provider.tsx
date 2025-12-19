@@ -64,6 +64,7 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
   );
 
   React.useEffect(() => {
+    // strudelService is a singleton; setIsToolUpdatingRepl is stable from useState
     return strudelService.onToolUpdatingReplChange(setIsToolUpdatingRepl);
   }, []);
 

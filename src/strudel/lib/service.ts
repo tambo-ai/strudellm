@@ -71,7 +71,8 @@ export class StrudelService {
   private loadingCallbacks: LoadingCallback[] = [];
   private stateChangeCallbacks: CodeChangeCallback[] = [];
 
-  private _isToolUpdatingRepl = false;
+  private toolUpdatingReplDepth = 0;
+  private didWarnToolUpdatingReplUnderflow = false;
   private toolUpdatingReplCallbacks: ((isUpdating: boolean) => void)[] = [];
   private readonly editorEditableCompartment = new Compartment();
 
@@ -105,23 +106,50 @@ export class StrudelService {
   private constructor() {}
 
   get isToolUpdatingRepl(): boolean {
-    return this._isToolUpdatingRepl;
+    return this.toolUpdatingReplDepth > 0;
   }
 
   setToolUpdatingRepl(value: boolean): void {
-    if (this._isToolUpdatingRepl === value) return;
+    const wasUpdating = this.isToolUpdatingRepl;
 
-    this._isToolUpdatingRepl = value;
-    this.toolUpdatingReplCallbacks.forEach((cb) => cb(value));
+    if (value) {
+      this.toolUpdatingReplDepth += 1;
+    } else if (this.toolUpdatingReplDepth > 0) {
+      this.toolUpdatingReplDepth -= 1;
+    } else if (
+      process.env.NODE_ENV === "development" &&
+      !this.didWarnToolUpdatingReplUnderflow
+    ) {
+      this.didWarnToolUpdatingReplUnderflow = true;
+      console.warn(
+        "[StrudelService] setToolUpdatingRepl(false) called while toolUpdatingReplDepth is already 0.",
+      );
+    }
+
+    const isUpdating = this.isToolUpdatingRepl;
+    if (wasUpdating === isUpdating) return;
+
+    this.toolUpdatingReplCallbacks.forEach((cb) => cb(isUpdating));
 
     if (this.editorInstance) {
-      this.setEditorEditable(!value);
+      this.setEditorEditable(!isUpdating);
     }
+  }
+
+  beginToolUpdatingRepl(): () => void {
+    this.setToolUpdatingRepl(true);
+
+    let ended = false;
+    return () => {
+      if (ended) return;
+      ended = true;
+      this.setToolUpdatingRepl(false);
+    };
   }
 
   onToolUpdatingReplChange(callback: (isUpdating: boolean) => void): () => void {
     this.toolUpdatingReplCallbacks.push(callback);
-    callback(this._isToolUpdatingRepl);
+    callback(this.isToolUpdatingRepl);
 
     return () => {
       this.toolUpdatingReplCallbacks = this.toolUpdatingReplCallbacks.filter(
@@ -965,13 +993,15 @@ export class StrudelService {
       this.editorInstance.editor.dispatch({
         effects: StateEffect.appendConfig.of(
           this.editorEditableCompartment.of(
-            EditorView.editable.of(!this._isToolUpdatingRepl),
+            EditorView.editable.of(!this.isToolUpdatingRepl),
           ),
         ),
       });
+
+      this.setEditorEditable(!this.isToolUpdatingRepl);
     } catch (error) {
       console.warn(
-        "[StrudelService] Failed to install editable compartment:",
+        "[StrudelService] Failed to install editable compartment; REPL edit blocking may not work correctly:",
         error,
       );
     }
@@ -987,7 +1017,10 @@ export class StrudelService {
         ),
       });
     } catch (error) {
-      console.warn("[StrudelService] Failed to toggle editor editability:", error);
+      console.warn(
+        "[StrudelService] Failed to toggle editor editability; updates may not block user edits as expected:",
+        error,
+      );
     }
   }
 

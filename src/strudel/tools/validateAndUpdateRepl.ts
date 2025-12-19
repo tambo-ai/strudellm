@@ -162,7 +162,7 @@ export const validateAndUpdateRepl: TamboTool = {
   tool: async (
     code: string,
   ): Promise<{ success: boolean; code?: string; error?: string }> => {
-    service.setToolUpdatingRepl(true);
+    const endToolUpdate = service.beginToolUpdatingRepl();
 
     try {
       await service.init();
@@ -195,7 +195,7 @@ export const validateAndUpdateRepl: TamboTool = {
 
       return result;
     } finally {
-      service.setToolUpdatingRepl(false);
+      endToolUpdate();
     }
   },
   toolSchema: z
