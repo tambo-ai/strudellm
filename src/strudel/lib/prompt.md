@@ -11,7 +11,7 @@ Don't output explanations or commentary to the thread, just use the tools to upd
 
 Use the `listSamples` tool when you need specific samples you're unsure about. However, these core sounds are always available and don't need verification:
 
-**Always-available synths:** sine, triangle, square, saw, supersaw, supersquare, fm, fmpiano
+**Always-available synths:** sine, triangle, square, sawtooth, supersaw, supersquare, fm, fmpiano
 **Always-available drums:** bd, sd, hh, oh, cp, rim (use with .bank() for specific machines)
 **Common banks:** RolandTR808, RolandTR909, LinnDrum, AlesisHR16
 
@@ -111,7 +111,7 @@ Sets pitch using letter notation with optional octave (0-8) and accidentals.
 ```javascript
 note("c3 e3 g3 b3")                 // C major 7 arpeggio
 note("c#4 eb4 f#4")                 // Sharps and flats
-note("c2").s("saw")            // Synth bass note
+note("c2").s("sawtooth")            // Synth bass note
 note("[c3,e3,g3]")                  // Chord (comma = simultaneous)
 note("c2 c3").s("piano")            // Piano with octaves
 ```
@@ -156,7 +156,7 @@ $snare: s("~ sd ~ sd").bank("RolandTR909").room(0.2)
 
 $hats: s("hh*8").gain("[.4 .6]*4")
 
-$bass: note("g1 ~ g1 g1, ~ ~ eb1 ~").s("saw").lpf(400)
+$bass: note("g1 ~ g1 g1, ~ ~ eb1 ~").s("sawtooth").lpf(400)
 ```
 
 **Why layers matter:**
@@ -273,7 +273,7 @@ Apply different effect chains to the same pattern:
 
 ```javascript
 note("c2").layer(
-  x => x.s("saw").lpf(400),
+  x => x.s("sawtooth").lpf(400),
   x => x.s("square").lpf(800).gain(0.5)
 )
 ```
@@ -439,7 +439,7 @@ chord("<Am F C G>")
 ```javascript
 "<Cm7 Fm7 G7 Cm7>".rootNotes(2)  // Extract roots at octave 2
   .struct("x ~ x ~")
-  .s("saw")
+  .s("sawtooth")
 ```
 
 ## Transposition
@@ -560,7 +560,7 @@ Default: 30 cpm (one cycle every 2 seconds, effectively 120 BPM in 4/4).
 Use `listSamples` to discover available sounds. Here's what categories exist:
 
 ## Built-in Synth Oscillators (always available)
-- **Basic waves:** sine, triangle, square, saw (or sin, tri, sqr, saw)
+- **Basic waves:** sine, triangle, square, sawtooth (or sin, tri, sqr, saw)
 - **Super (detuned):** supersaw, supersquare
 - **FM synths:** fm, fmpiano
 - **Noise:** white, pink, brown, crackle
@@ -599,7 +599,7 @@ $snare: s("~ sd ~ sd").bank("RolandTR909").gain(0.8).room(0.2)
 $hats: s("hh*8").bank("RolandTR909").gain("[.4 .6]*4").pan(sine.range(0.3, 0.7))
 
 $bass: note("g1 ~ g1 g1, ~ ~ eb1 ~")
-  .s("saw")
+  .s("sawtooth")
   .lpf(sine.range(200, 800).slow(4))
   .gain(0.6)
   .distort(0.15)
@@ -648,7 +648,7 @@ $arp: n("0 2 4 6 7 6 4 2")
 setCpm(124/4)
 $kick: s("bd*4").bank("RolandTR909").gain(0.95)
 $hats: s("~ hh ~ hh, hh*8").bank("RolandTR909").gain(0.4)
-$bass: note("c2 c2 ~ c2").s("saw").lpf(600).gain(0.6)
+$bass: note("c2 c2 ~ c2").s("sawtooth").lpf(600).gain(0.6)
 ```
 **Key elements:** TR-909, steady kick, offbeat hats, punchy bass
 
@@ -656,7 +656,7 @@ $bass: note("c2 c2 ~ c2").s("saw").lpf(600).gain(0.6)
 ```javascript
 setCpm(130/4)
 $kick: s("bd*4").bank("RolandTR909").gain(0.95)
-$synth: note("a1").s("saw").lpf(sine.range(300, 1500).slow(8)).gain(0.5).distort(0.2)
+$synth: note("a1").s("sawtooth").lpf(sine.range(300, 1500).slow(8)).gain(0.5).distort(0.2)
 ```
 **Key elements:** Driving kick, modulated filter sweeps, minimal but intense
 
@@ -673,7 +673,7 @@ $keys: note("<[e3,g3,b3] [d3,f#3,a3]>").s("piano").lpf(2000).room(0.5).gain(0.3)
 setCpm(174/4)
 $kick: s("bd ~ ~ ~, ~ ~ bd ~").bank("RolandTR909")
 $snare: s("~ sd ~ sd").bank("RolandTR909")
-$bass: note("e1 ~ [e1 g1] ~").s("saw").lpf(sine.range(200, 800).slow(4)).distort(0.15)
+$bass: note("e1 ~ [e1 g1] ~").s("sawtooth").lpf(sine.range(200, 800).slow(4)).distort(0.15)
 ```
 **Key elements:** Fast tempo (170-180 BPM), syncopated kick, rolling bass
 
