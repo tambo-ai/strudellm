@@ -152,6 +152,18 @@ const bestEffortNonSecureId = (): string => {
     }
   }
 
+  try {
+    if (globalThis.crypto?.getRandomValues) {
+      const bytes = new Uint8Array(16);
+      globalThis.crypto.getRandomValues(bytes);
+      return Array.from(bytes)
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+    }
+  } catch {
+    // Fall through
+  }
+
   nonSecureCounter = (nonSecureCounter + 1) % Number.MAX_SAFE_INTEGER;
   return `${Date.now()}-${nonSecureCounter}-${Math.random().toString(16).slice(2)}`;
 };
@@ -258,6 +270,11 @@ function AppContent() {
     { contextKey: canUseContextKey ? contextKeyState.contextKey : undefined },
     { enabled: canUseContextKey },
   );
+
+  React.useEffect(() => {
+    if (!contextKeyState.isReady) return;
+    setThreadInitialized(false);
+  }, [contextKeyState.isReady, contextKeyState.contextKey]);
 
   // Track AI generation state to lock editor during updates
   React.useEffect(() => {
