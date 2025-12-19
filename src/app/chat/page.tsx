@@ -58,6 +58,11 @@ const BETA_MODAL_SHOWN_KEY = "strudel-beta-modal-shown-v1";
 
 // Tambo context helpers docs: https://docs.tambo.co/concepts/additional-context/configuration
 // Exposes current Strudel REPL code + error state to the AI.
+// This lets the model respond based on the live editor state (e.g., surfacing errors and suggesting fixes).
+// The returned object should stay small, JSON-serializable, and must not include secrets or sensitive
+// user data (it is sent to the Tambo backend as additional model context).
+// Note: The `instruction` below assumes the `updateRepl` tool can safely overwrite the REPL with corrected
+// code for any error surfaced here. If `updateRepl` behavior changes, update this helper and tool docs together.
 const strudelContextHelper = () => {
   const service = StrudelService.instance();
   const state = service.getReplState();
@@ -92,43 +97,95 @@ const strudelContextHelper = () => {
 };
 
 // Storage key for anonymous context
-const CONTEXT_KEY_STORAGE = "strudel-ai-context-key";
+const ANON_CONTEXT_KEY_STORAGE = "strudel-ai-context-key";
+const AUTH_CONTEXT_KEY_STORAGE = "strudel-ai-auth-context-key";
+
+const safeLocalStorageGetItem = (key: string): string | null => {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(key);
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("Failed to read localStorage item", { key, error });
+    }
+    return null;
+  }
+};
+
+const safeLocalStorageSetItem = (key: string, value: string): void => {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(key, value);
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("Failed to write localStorage item", { key, error });
+    }
+    // Best-effort only; ignore storage failures (private browsing, quota, etc.)
+  }
+};
+
+// Best-effort ID generation. Not suitable for auth/session/security tokens.
+let nonSecureCounter = 0;
+const bestEffortNonSecureId = (): string => {
+  try {
+    const uuid = globalThis.crypto?.randomUUID?.();
+    if (uuid) return uuid;
+  } catch {
+    // Fall through
+  }
+
+  nonSecureCounter = (nonSecureCounter + 1) % Number.MAX_SAFE_INTEGER;
+  return `${Date.now()}-${nonSecureCounter}-${Math.random().toString(16).slice(2)}`;
+};
 
 // Get or create anonymous context key (for users not logged in)
-const getOrCreateAnonymousContextKey = (): string => {
-  if (typeof window === "undefined") return "";
+const getOrCreateAnonymousContextKey = (): string | null => {
+  if (typeof window === "undefined") return null;
 
-  let contextKey = localStorage.getItem(CONTEXT_KEY_STORAGE);
-  if (!contextKey) {
-    contextKey = `strudel-ai-anon-${crypto.randomUUID()}`;
-    localStorage.setItem(CONTEXT_KEY_STORAGE, contextKey);
-  }
+  const existing = safeLocalStorageGetItem(ANON_CONTEXT_KEY_STORAGE);
+  if (existing) return existing;
+
+  const contextKey = `strudel-ai-anon-${bestEffortNonSecureId()}`;
+  safeLocalStorageSetItem(ANON_CONTEXT_KEY_STORAGE, contextKey);
   return contextKey;
 };
 
 // Hook to get a stable context key (persistent per-browser when logged in, anonymous otherwise).
-// Note: this is not tied to a specific user identifier and may be shared if multiple users log in
-// on the same browser profile.
-function useContextKey(): string {
+// NOTE: This is *not* a user identifier and may be shared across different accounts using the same
+// browser profile. Do not use this key for auth, permissions, or any security decisions.
+// This hook assumes it only runs in the browser (client components).
+function useContextKey():
+  | { contextKey: string; isReady: true }
+  | { contextKey: null; isReady: false } {
   const { isAuthenticated, isLoaded } = useStrudelStorage();
-  const [anonymousKey] = React.useState(getOrCreateAnonymousContextKey);
+  const [contextKey, setContextKey] = React.useState<string | null>(null);
 
-  // If user is logged in, use a persistent key stored in localStorage.
-  // This keeps the thread list stable across reloads for the same browser profile.
-  if (isAuthenticated && isLoaded) {
-    // For authenticated users, we use a separate persistent key
-    // that gets created once and stored (similar to anonymous key)
-    const AUTH_CONTEXT_KEY_STORAGE = "strudel-ai-auth-context-key";
-    let authKey = localStorage.getItem(AUTH_CONTEXT_KEY_STORAGE);
-    if (!authKey) {
-      authKey = `strudel-user-${crypto.randomUUID()}`;
-      localStorage.setItem(AUTH_CONTEXT_KEY_STORAGE, authKey);
+  React.useEffect(() => {
+    if (!isLoaded) return;
+
+    if (isAuthenticated) {
+      // For authenticated users, we use a separate persistent key
+      // that gets created once and stored (similar to anonymous key)
+      const existingAuthKey = safeLocalStorageGetItem(AUTH_CONTEXT_KEY_STORAGE);
+      if (existingAuthKey) {
+        setContextKey(existingAuthKey);
+        return;
+      }
+
+      const authKey = `strudel-user-${bestEffortNonSecureId()}`;
+      safeLocalStorageSetItem(AUTH_CONTEXT_KEY_STORAGE, authKey);
+      setContextKey(authKey);
+      return;
     }
-    return authKey;
+
+    setContextKey(getOrCreateAnonymousContextKey());
+  }, [isAuthenticated, isLoaded]);
+
+  if (contextKey) {
+    return { contextKey, isReady: true };
   }
 
-  // Otherwise use anonymous key
-  return anonymousKey;
+  return { contextKey: null, isReady: false };
 }
 
 const strudelSuggestions: Suggestion[] = [
@@ -156,7 +213,8 @@ function AppContent() {
   const [threadInitialized, setThreadInitialized] = React.useState(false);
   const [replInitialized, setReplInitialized] = React.useState(false);
   const [showBetaModal, setShowBetaModal] = React.useState(false);
-  const contextKey = useContextKey();
+  const contextKeyState = useContextKey();
+  const canUseContextKey = contextKeyState.isReady;
   const { isPending } = useLoadingState();
   const isAuthenticated = useIsAuthenticated();
   const {
@@ -178,9 +236,10 @@ function AppContent() {
   const { thread, startNewThread, switchCurrentThread, isIdle } =
     useTamboThread();
   const { generationStage } = useTambo();
-  const { data: threadList, isSuccess: threadListLoaded } = useTamboThreadList({
-    contextKey,
-  });
+  const { data: threadList, isSuccess: threadListLoaded } = useTamboThreadList(
+    { contextKey: canUseContextKey ? contextKeyState.contextKey : undefined },
+    { enabled: canUseContextKey },
+  );
 
   // Track AI generation state to lock editor during updates
   React.useEffect(() => {
@@ -257,9 +316,15 @@ function AppContent() {
     }
   }, [thread, getThreadReplId, isReplArchived, unarchiveRepl, setReplId]);
 
+  if (!contextKeyState.isReady) {
+    return <LoadingScreen />;
+  }
+
   if (isPending || !strudelIsReady || !thread) {
     return <LoadingScreen />;
   }
+
+  const readyContextKey = contextKeyState.contextKey;
 
   return (
     <Frame>
@@ -286,7 +351,7 @@ function AppContent() {
 
           {/* Input */}
           <div className="p-3 border-t border-border">
-            <MessageInput contextKey={contextKey}>
+            <MessageInput contextKey={readyContextKey}>
               <MessageInputTextarea placeholder=">" />
               <MessageInputToolbar>
                 <MessageInputNewThreadButton />
@@ -300,7 +365,7 @@ function AppContent() {
 
       {/* Thread History Sidebar */}
       <ThreadHistory
-        contextKey={contextKey}
+        contextKey={readyContextKey}
         position="right"
         defaultCollapsed={true}
       >

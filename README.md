@@ -77,8 +77,11 @@ Key places we use Tambo in this repo:
 Relevant docs:
 
 - Requires `NEXT_PUBLIC_TAMBO_API_KEY` (and optionally `NEXT_PUBLIC_TAMBO_URL`); see `example.env.local`.
+- `NEXT_PUBLIC_TAMBO_URL` is only needed if you're pointing at a non-default Tambo environment (e.g. self-hosted); most setups can omit it.
+  If `NEXT_PUBLIC_TAMBO_URL` is unset, `@tambo-ai/react` will use the default Tambo Cloud API (https://api.tambo.ai).
 
 - https://docs.tambo.co/getting-started/integrate
+- https://docs.tambo.co/llms.txt
 - https://docs.tambo.co/concepts/components/
 - https://docs.tambo.co/concepts/tools/adding-tools
 - https://docs.tambo.co/concepts/additional-context/configuration

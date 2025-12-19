@@ -12,11 +12,9 @@
  *
  */
 
-// See README.md ("Tambo integration") for a high-level map of how this repo uses Tambo.
-// Tambo docs: https://docs.tambo.co/getting-started/integrate
-// Components: https://docs.tambo.co/concepts/components/registering-with-tambo-provider
-// Tools: https://docs.tambo.co/concepts/tools/adding-tools
-// Initial messages/custom instructions: https://docs.tambo.co/concepts/message-threads/initial-messages
+// See README.md ("Tambo integration") for an overview of how this repo uses Tambo.
+// Tambo docs: https://docs.tambo.co
+// Key topics: integrating the SDK, registering components/tools, initial messages/custom instructions.
 
 import type { TamboComponent, TamboTool } from "@tambo-ai/react";
 import { validateAndUpdateRepl } from "@/strudel/tools/validateAndUpdateRepl";
