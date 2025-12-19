@@ -137,8 +137,14 @@ async function parseFeedbackError(res: Response): Promise<{
         : undefined,
   };
 
-  const text =
-    payload.message || payload.error ? null : JSON.stringify(data).slice(0, 1000);
+  let text: string | null = null;
+  if (!payload.message && !payload.error) {
+    try {
+      text = JSON.stringify(data).slice(0, 1000);
+    } catch {
+      text = null;
+    }
+  }
 
   return { status: res.status, payload, text };
 }
