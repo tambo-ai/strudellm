@@ -125,13 +125,16 @@ const safeLocalStorageSetItem = (key: string, value: string): void => {
 };
 
 // Best-effort ID generation. Not suitable for auth/session/security tokens.
+// Return value is an opaque string; format may vary between UUID-like and raw hex.
 let nonSecureCounter = 0;
 const bestEffortNonSecureId = (): string => {
   try {
     const uuid = globalThis.crypto?.randomUUID?.();
     if (uuid) return uuid;
-  } catch {
-    // Fall through
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("bestEffortNonSecureId: randomUUID failed", error);
+    }
   }
 
   try {
@@ -143,8 +146,10 @@ const bestEffortNonSecureId = (): string => {
         .map((b) => b.toString(16).padStart(2, "0"))
         .join("");
     }
-  } catch {
-    // Fall through
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("bestEffortNonSecureId: getRandomValues failed", error);
+    }
   }
 
   nonSecureCounter = (nonSecureCounter + 1) % Number.MAX_SAFE_INTEGER;
