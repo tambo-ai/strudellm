@@ -14,7 +14,9 @@ export function HeroDemoVideo() {
       if (video) {
         video.muted = nextMuted;
         if (!nextMuted) {
-          void video.play().catch(() => undefined);
+          void video.play().catch(() => {
+            // Ignore: some browsers block play() depending on autoplay policy.
+          });
         }
       }
 
@@ -29,6 +31,7 @@ export function HeroDemoVideo() {
         ref={videoRef}
         className="w-full h-full object-cover"
         autoPlay
+        // Only loop while muted to reduce the chance of unexpected background audio.
         loop={isMuted}
         muted={isMuted}
         playsInline
