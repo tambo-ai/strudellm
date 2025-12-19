@@ -39,15 +39,20 @@ type UpdateSource = "ai" | "user";
 const DEFAULT_CODE = `// Welcome to StrudelLM!
 // Write patterns here or ask the AI for help
 
-// Example: Synth line with scope + gain slider, and a pianoroll
-// slider(initial, min, max, step) is a built-in UI control; pass its value to .gain
-n("0 2 4 7")
-  .s("sawtooth")
-  .gain(slider(0.4, 0, 1, 0.01))
-  ._scope({ height: 120, scale: 0.5 })
-
-// Add a pianoroll visualization on a simple pattern
-s("bd sd bd sd")._pianoroll({ fold: 1 })
+// Example: Synth with scope and pianoroll visualizations
+// slider(initial, min, max, step) is a built-in UI control
+stack(
+  n("0 2 4 7")
+    .s("sawtooth")
+    .lpf(1200)
+    .gain(slider(0.4, 0, 1, 0.01))
+    ._scope({ height: 120, scale: 0.5 }),
+  n("0 [7 5] 3 [5 7]")
+    .s("square")
+    .lpf(400)
+    .gain(0.3)
+    ._pianoroll({ fold: 1 })
+)
 `;
 
 const ALLOWED_KEYBINDINGS = ["codemirror", "vim", "emacs", "vscode"] as const;
@@ -956,7 +961,19 @@ const keybindings = getKeybindings();
     this.registerGlobalErrorHandlers();
     this.installConsoleErrorFilter();
     try {
-      return await this.editorInstance?.evaluate();
+      await this.editorInstance?.evaluate();
+
+      // Workaround for Strudel bug: when samples need to load, the scheduler
+      // briefly stops which kills visualization animations. Re-evaluate after
+      // a delay to restart them once samples are loaded.
+      // See: https://github.com/tidalcycles/strudel/issues/XXX
+      setTimeout(() => {
+        if (this.isPlaying && this.editorInstance) {
+          // Re-evaluate to restart visualization animations
+          // The scheduler will continue playing, just the pattern updates
+          this.editorInstance.evaluate();
+        }
+      }, 500);
     } catch (error) {
       // Capture runtime errors (like "sound X not found") that are thrown
       // during evaluate. The onError callback should also capture these,
