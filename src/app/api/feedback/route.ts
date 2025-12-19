@@ -20,12 +20,6 @@ function escapeHtml(str: string | null | undefined) {
     .replaceAll("'", "&#039;");
 }
 
-function redactEmail(email: string): string {
-  const atIndex = email.lastIndexOf("@");
-  if (atIndex <= 0) return "(invalid or missing)";
-  return "***@***";
-}
-
 export async function POST(req: Request) {
   let payload: unknown;
   try {
@@ -83,6 +77,7 @@ export async function POST(req: Request) {
   }
 
   const { title, body } = parsed.data;
+
   const userEmail = session.user.email;
   const userEmailParse = z.string().email().safeParse(userEmail);
   if (!userEmailParse.success && !isProduction) {
@@ -94,7 +89,7 @@ export async function POST(req: Request) {
     ? userEmailParse.data
     : "(invalid or missing)";
 
-  // In development (and in production without RESEND_API_KEY), log feedback rather than fail hard.
+  // In development (and in production without RESEND_API_KEY), accept feedback rather than fail hard.
   // This keeps local dev usable without requiring email credentials.
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
@@ -105,16 +100,6 @@ export async function POST(req: Request) {
         { status: 500 },
       );
     }
-
-    const redactedUserEmail = userEmailParse.success
-      ? redactEmail(userEmailParse.data)
-      : "(invalid or missing)";
-
-    console.log("[feedback]", {
-      title,
-      body,
-      userEmail: redactedUserEmail,
-    });
     return NextResponse.json({ ok: true, delivered: false });
   }
 
