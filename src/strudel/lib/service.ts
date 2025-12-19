@@ -71,6 +71,8 @@ export class StrudelService {
 
   private toolUpdatingReplDepth = 0;
   private didWarnToolUpdatingReplUnderflow = false;
+  // Notified when tool-driven REPL updates begin/end.
+  // This state is a UI signal and does not affect editor editability.
   private toolUpdatingReplCallbacks: ((isUpdating: boolean) => void)[] = [];
 
   // Repl state
@@ -129,6 +131,12 @@ export class StrudelService {
     this.toolUpdatingReplCallbacks.forEach((cb) => cb(isUpdating));
   }
 
+  /**
+   * Marks the beginning of a tool-driven REPL update section.
+   *
+   * Always call the returned function once the tool update is complete,
+   * ideally via `try/finally` to ensure proper depth tracking even on errors.
+   */
   beginToolUpdatingRepl(): () => void {
     this.setToolUpdatingRepl(true);
 
