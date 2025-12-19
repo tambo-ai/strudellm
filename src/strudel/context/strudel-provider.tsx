@@ -31,6 +31,7 @@ type StrudelContextValue = {
   clearError: () => void;
   /**
    * Callback ref for attaching/detaching the Strudel editor root.
+   * Called with a non-null element on mount and with `null` on unmount.
    */
   setRoot: (el: HTMLDivElement | null) => void;
   isReady: boolean;
@@ -47,21 +48,34 @@ const strudelService = StrudelService.instance();
 
 let initPromise: Promise<void> | null = null;
 let initError: unknown = null;
+let initAttempts = 0;
+const MAX_INIT_ATTEMPTS = 3;
 const ensureStrudelReady = (): Promise<void> => {
   if (strudelService.isReady) {
     return Promise.resolve();
   }
 
   if (initError) {
-    return Promise.reject(initError);
+    if (initAttempts >= MAX_INIT_ATTEMPTS) {
+      return Promise.reject(initError);
+    }
+    initError = null;
   }
 
   if (!initPromise) {
-    initPromise = strudelService.init().catch((error) => {
-      initError = error;
-      initPromise = null;
-      throw error;
-    });
+    initAttempts += 1;
+    initPromise = strudelService
+      .init()
+      .then(() => {
+        if (!strudelService.isReady) {
+          initPromise = null;
+        }
+      })
+      .catch((error) => {
+        initError = error;
+        initPromise = null;
+        throw error;
+      });
   }
 
   return initPromise;
