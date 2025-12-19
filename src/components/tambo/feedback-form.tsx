@@ -155,6 +155,7 @@ export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
     const { data: session } = useSession();
     const isSignedIn = Boolean(session?.user?.email);
     const [showAuthModal, setShowAuthModal] = React.useState(false);
+    // Dev-only: keep warnings local to the mounted component and avoid module-level state.
     const didWarnInvalidGithubNewIssueBaseRef = React.useRef(false);
 
     const [draftTitle, setDraftTitle] = useTamboComponentState<string>(
