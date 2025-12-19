@@ -53,6 +53,7 @@ import { StrudelStatusBar } from "@/strudel/components/strudel-status-bar";
 import { StrudelService } from "@/strudel/lib/service";
 import { useStrudelStorage } from "@/hooks/use-strudel-storage";
 import { BetaModal } from "@/components/beta-modal";
+import { useSession } from "@/lib/auth-client";
 
 const BETA_MODAL_SHOWN_KEY = "strudel-beta-modal-shown-v1";
 
@@ -98,7 +99,6 @@ const strudelContextHelper = () => {
 
 // Storage key for anonymous context
 const ANON_CONTEXT_KEY_STORAGE = "strudel-ai-context-key";
-const AUTH_CONTEXT_KEY_STORAGE = "strudel-ai-auth-context-key";
 
 const safeLocalStorageGetItem = (key: string): string | null => {
   if (typeof window === "undefined") return null;
@@ -168,36 +168,27 @@ const getOrCreateAnonymousContextKey = (): string | null => {
   return contextKey;
 };
 
-// Hook to get a stable context key (persistent per-browser when logged in, anonymous otherwise).
-// NOTE: This is *not* a user identifier and may be shared across different accounts using the same
-// browser profile. Do not use this key for auth, permissions, or any security decisions.
+// Hook to get a stable context key for Tambo thread scoping.
+// - Authenticated users: Better Auth user id (stable across devices)
+// - Anonymous users: persistent per-browser id stored in localStorage
+// NOTE: This is not an auth token. Do not use this value for permissions or other security decisions.
 // This hook assumes it only runs in the browser (client components).
 function useContextKey():
   | { contextKey: string; isReady: true }
   | { contextKey: null; isReady: false } {
-  const { isAuthenticated, isLoaded } = useStrudelStorage();
+  const { data: session, isPending: isSessionPending } = useSession();
   const [contextKey, setContextKey] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    if (!isLoaded) return;
+    if (isSessionPending) return;
 
-    if (isAuthenticated) {
-      // For authenticated users, we use a separate persistent key
-      // that gets created once and stored (similar to anonymous key)
-      const existingAuthKey = safeLocalStorageGetItem(AUTH_CONTEXT_KEY_STORAGE);
-      if (existingAuthKey) {
-        setContextKey(existingAuthKey);
-        return;
-      }
-
-      const authKey = `strudel-user-${bestEffortNonSecureId()}`;
-      safeLocalStorageSetItem(AUTH_CONTEXT_KEY_STORAGE, authKey);
-      setContextKey(authKey);
+    if (session?.user?.id) {
+      setContextKey(`strudel-user-${session.user.id}`);
       return;
     }
 
     setContextKey(getOrCreateAnonymousContextKey());
-  }, [isAuthenticated, isLoaded]);
+  }, [isSessionPending, session?.user?.id]);
 
   if (contextKey) {
     return { contextKey, isReady: true };
@@ -419,19 +410,36 @@ export default function ChatPage() {
       <LoadingContextProvider>
         <StrudelProvider>
           <StrudelStorageSync />
-          <TamboProvider
-            tamboUrl={process.env.NEXT_PUBLIC_TAMBO_URL}
-            apiKey={apiKey}
-            tools={tools}
-            components={components}
-            contextHelpers={{
-              strudelState: strudelContextHelper,
-            }}
-          >
+          <TamboAuthedProvider apiKey={apiKey}>
             <AppContent />
-          </TamboProvider>
+          </TamboAuthedProvider>
         </StrudelProvider>
       </LoadingContextProvider>
     </JazzAndAuthProvider>
+  );
+}
+
+function TamboAuthedProvider({
+  apiKey,
+  children,
+}: {
+  apiKey: string;
+  children: React.ReactNode;
+}) {
+  const { data: sessionData } = useSession();
+
+  return (
+    <TamboProvider
+      tamboUrl={process.env.NEXT_PUBLIC_TAMBO_URL}
+      apiKey={apiKey}
+      userToken={sessionData?.session?.token}
+      tools={tools}
+      components={components}
+      contextHelpers={{
+        strudelState: strudelContextHelper,
+      }}
+    >
+      {children}
+    </TamboProvider>
   );
 }
