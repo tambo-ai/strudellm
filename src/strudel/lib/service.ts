@@ -134,6 +134,8 @@ export class StrudelService {
   /**
    * Marks the beginning of a tool-driven REPL update section.
    *
+   * This is a UI signal only and does not lock the editor.
+   *
    * Always call the returned function once the tool update is complete,
    * ideally via `try/finally` to ensure proper depth tracking even on errors.
    */
