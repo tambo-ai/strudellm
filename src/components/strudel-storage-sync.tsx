@@ -267,7 +267,13 @@ export function StrudelStorageSync() {
     } else {
       // Anonymous user has existing REPLs - load the active one (or first as fallback)
       if (!service.getCurrentReplId()) {
-        service.setReplId(storage.getActiveReplId() ?? allRepls[0].id);
+        const activeReplId = storage.getActiveReplId();
+        const replId =
+          activeReplId && allRepls.some((repl) => repl.id === activeReplId)
+            ? activeReplId
+            : allRepls[0].id;
+
+        service.setReplId(replId);
       }
       // If we had saved code and have an existing REPL, update it
       // (This handles the case where user signed out, then refreshed page)
