@@ -1,6 +1,12 @@
 "use client";
 
 import { config } from "@/lib/config";
+import {
+  FEEDBACK_BODY_MAX_LENGTH,
+  FEEDBACK_BODY_MIN_LENGTH,
+  FEEDBACK_TITLE_MAX_LENGTH,
+  FEEDBACK_TITLE_MIN_LENGTH,
+} from "@/lib/feedback";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/lib/auth-client";
 import { AuthModal } from "@/components/auth/auth-modal";
@@ -12,15 +18,15 @@ import { z } from "zod/v3";
 export const feedbackFormSchema = z.object({
   title: z
     .string()
-    .min(3)
-    .max(80)
+    .min(FEEDBACK_TITLE_MIN_LENGTH)
+    .max(FEEDBACK_TITLE_MAX_LENGTH)
     .describe(
       "A short feedback title (aim for 5–10 words) describing the user’s problem or request. Used for either the support email subject (when signed in) or the GitHub issue title (when signed out).",
     ),
   body: z
     .string()
-    .min(10)
-    .max(4000)
+    .min(FEEDBACK_BODY_MIN_LENGTH)
+    .max(FEEDBACK_BODY_MAX_LENGTH)
     .describe(
       "A longer description of what the user is trying to do, what they expected, and what happened instead. Used for either the support email body (when signed in) or the GitHub issue body (when signed out).",
     ),
@@ -37,6 +43,21 @@ function buildGithubIssueBody({
   const metaLine = "<!-- submitted-via: StrudelLM FeedbackForm -->";
 
   return `${cleanedBody}\n\n${metaLine}\n`;
+}
+
+function getSafeGithubNewIssueBase(raw: string): string | null {
+  try {
+    const url = new URL(raw);
+
+    if (url.protocol !== "https:") return null;
+    if (url.hostname !== "github.com") return null;
+
+    url.hash = "";
+    url.search = "";
+    return url.toString().replace(/\?$/, "");
+  } catch {
+    return null;
+  }
 }
 
 export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
@@ -66,6 +87,10 @@ export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
       "isSubmitted",
       false,
     );
+    const [wasDelivered, setWasDelivered] = useTamboComponentState<boolean | null>(
+      "wasDelivered",
+      null,
+    );
     const [submitError, setSubmitError] = useTamboComponentState<string | null>(
       "submitError",
       null,
@@ -90,7 +115,10 @@ export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
       const cleanedTitle = (draftTitle ?? "").trim();
       const cleanedBody = (draftBody ?? "").trim();
 
-      if (cleanedBody.length < 10) return null;
+      if (cleanedBody.length < FEEDBACK_BODY_MIN_LENGTH) return null;
+
+      const base = getSafeGithubNewIssueBase(config.githubNewIssue);
+      if (!base) return null;
 
       const params = new URLSearchParams();
       params.set("title", cleanedTitle || "Feedback from StrudelLM");
@@ -101,7 +129,7 @@ export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
         }),
       );
 
-      return `${config.githubNewIssue}?${params.toString()}`;
+      return `${base}?${params.toString()}`;
     }, [draftTitle, draftBody]);
 
     const isDisabled = isSubmitted || isSending;
@@ -175,6 +203,19 @@ export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
           throw new Error(text || "Request failed");
         }
 
+        const contentType = res.headers.get("content-type") ?? "";
+        if (contentType.includes("application/json")) {
+          const data: unknown = await res.json().catch(() => null);
+          if (
+            data &&
+            typeof data === "object" &&
+            "delivered" in data &&
+            typeof (data as { delivered?: unknown }).delivered === "boolean"
+          ) {
+            setWasDelivered((data as { delivered: boolean }).delivered);
+          }
+        }
+
         setIsSubmitted(true);
       } catch (error) {
         setSubmitError(
@@ -231,8 +272,8 @@ export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
                 isDisabled && "opacity-70",
               )}
               placeholder="Short summary (5–10 words)"
-              minLength={3}
-              maxLength={80}
+              minLength={FEEDBACK_TITLE_MIN_LENGTH}
+              maxLength={FEEDBACK_TITLE_MAX_LENGTH}
               required
             />
           </div>
@@ -255,8 +296,8 @@ export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
                 isDisabled && "opacity-70",
               )}
               placeholder="What were you trying to do? What did you expect? What happened instead?"
-              minLength={10}
-              maxLength={4000}
+              minLength={FEEDBACK_BODY_MIN_LENGTH}
+              maxLength={FEEDBACK_BODY_MAX_LENGTH}
               required
             />
           </div>
@@ -300,6 +341,13 @@ export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
                           ? "Having trouble sending? Open a GitHub issue so we can track it."
                           : "Prefer GitHub? Open an issue so we can track this."}
                     </p>
+
+                    {isSubmitted && wasDelivered === false && (
+                      <p className="text-xs text-muted-foreground">
+                        Feedback was accepted, but email isn’t configured here.
+                        Please open a GitHub issue so we can track it.
+                      </p>
+                    )}
                     <a
                       href={githubIssueUrl}
                       target="_blank"

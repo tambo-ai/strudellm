@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import {
+  FEEDBACK_BODY_MAX_LENGTH,
+  FEEDBACK_BODY_MIN_LENGTH,
+  FEEDBACK_TITLE_MAX_LENGTH,
+  FEEDBACK_TITLE_MIN_LENGTH,
+} from "@/lib/feedback";
 import { Resend } from "resend";
 import { z } from "zod";
 
 const isProduction = process.env.NODE_ENV === "production";
 
 const feedbackRequestSchema = z.object({
-  title: z.string().min(3).max(80),
-  body: z.string().min(10).max(4000),
+  title: z.string().min(FEEDBACK_TITLE_MIN_LENGTH).max(FEEDBACK_TITLE_MAX_LENGTH),
+  body: z.string().min(FEEDBACK_BODY_MIN_LENGTH).max(FEEDBACK_BODY_MAX_LENGTH),
 });
 
 function escapeHtml(str: string | null | undefined) {
@@ -89,8 +95,7 @@ export async function POST(req: Request) {
     ? userEmailParse.data
     : "(invalid or missing)";
 
-  // In development (and in production without RESEND_API_KEY), accept feedback rather than fail hard.
-  // This keeps local dev usable without requiring email credentials.
+  // In development, accept feedback rather than fail hard when RESEND_API_KEY is missing.
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     if (isProduction) {
