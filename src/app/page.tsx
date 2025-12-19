@@ -62,9 +62,9 @@ export default function LandingPage() {
           </p>
 
           {/* Video Demo */}
-          <div className="relative mb-10 mx-auto w-full max-w-2xl rounded-2xl overflow-hidden border border-border/50 shadow-2xl shadow-success/5 bg-black/50 backdrop-blur-sm">
+          <div className="relative mb-10 mx-auto w-full max-w-2xl aspect-[85/54] rounded-2xl overflow-hidden border border-border/50 shadow-2xl shadow-success/5 bg-black/50 backdrop-blur-sm">
             <video
-              className="w-full h-auto"
+              className="w-full h-full object-cover"
               autoPlay
               loop
               muted
