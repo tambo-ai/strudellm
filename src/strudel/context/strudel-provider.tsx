@@ -91,6 +91,7 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
   const [isAiUpdating, setIsAiUpdating] = React.useState(false);
   const isAiUpdatingRef = React.useRef(isAiUpdating);
   const attachOperationIdRef = React.useRef(0);
+  const rootElementRef = React.useRef<HTMLDivElement | null>(null);
   React.useEffect(() => {
     isAiUpdatingRef.current = isAiUpdating;
   }, [isAiUpdating]);
@@ -151,7 +152,11 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
     };
   }, [setMessage, setProgress, setReplState, setState]);
 
+  // Intentionally stable: this is used as a callback ref.
   const setRoot = React.useCallback((el: HTMLDivElement | null) => {
+    if (el === rootElementRef.current) return;
+    rootElementRef.current = el;
+
     attachOperationIdRef.current += 1;
     const operationId = attachOperationIdRef.current;
 
