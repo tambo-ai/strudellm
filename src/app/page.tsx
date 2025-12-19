@@ -69,13 +69,16 @@ export default function LandingPage() {
               loop
               muted
               playsInline
-              aria-label="Demo of StrudelLM live coding music with AI assistance"
+              aria-label="StrudelLM live coding music demo"
             >
               <source
                 src="https://github.com/user-attachments/assets/6f88f3b3-4be2-41fe-b77e-199213811278"
                 type="video/mp4"
               />
-              Demo video (StrudelLM live coding with AI) is not supported in this browser.
+              <p className="bg-background/80 p-4 text-center text-sm text-muted-foreground">
+                Demo video (StrudelLM live coding with AI) is not supported in this
+                browser.
+              </p>
             </video>
           </div>
 
