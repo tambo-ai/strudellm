@@ -37,6 +37,7 @@ export function GenerationIndicator({
   className,
   ...props
 }: GenerationIndicatorProps) {
+  const hasHints = HINTS.length > 0;
   const [showHints, setShowHints] = React.useState(false);
   const [dotCount, setDotCount] = React.useState(0);
   const [hintIndex, setHintIndex] = React.useState(0);
@@ -53,6 +54,8 @@ export function GenerationIndicator({
     setDotCount(0);
     setHintIndex(0);
 
+    if (!hasHints) return;
+
     const timeout = window.setTimeout(() => {
       setShowHints(true);
     }, INITIAL_HINT_DELAY_MS);
@@ -60,22 +63,22 @@ export function GenerationIndicator({
     return () => {
       window.clearTimeout(timeout);
     };
-  }, [isGenerating]);
+  }, [hasHints, isGenerating]);
 
   React.useEffect(() => {
-    if (!isGenerating || showHints) return;
+    if (!isGenerating || (showHints && hasHints)) return;
 
     const interval = window.setInterval(() => {
-      setDotCount((prev) => (prev + 1) % 3);
+      setDotCount((prev) => (prev + 1) % 4);
     }, DOTS_TICK_MS);
 
     return () => {
       window.clearInterval(interval);
     };
-  }, [isGenerating, showHints]);
+  }, [hasHints, isGenerating, showHints]);
 
   React.useEffect(() => {
-    if (!isGenerating || !showHints) return;
+    if (!isGenerating || !showHints || !hasHints) return;
 
     const interval = window.setInterval(() => {
       setHintIndex((prev) => (prev + 1) % HINTS.length);
@@ -84,10 +87,10 @@ export function GenerationIndicator({
     return () => {
       window.clearInterval(interval);
     };
-  }, [isGenerating, showHints]);
+  }, [hasHints, isGenerating, showHints]);
 
-  const hint = HINTS[hintIndex];
-  const dots = "..." + ".".repeat(dotCount);
+  const hint = hasHints ? HINTS[hintIndex] : null;
+  const dots = ".".repeat(dotCount);
 
   return (
     <div
@@ -99,7 +102,7 @@ export function GenerationIndicator({
       aria-live="polite"
       {...props}
     >
-      {!isGenerating ? null : showHints ? (
+      {!isGenerating ? null : showHints && hint ? (
         <a
           className="underline underline-offset-4 hover:text-foreground truncate"
           href={hint.href}
