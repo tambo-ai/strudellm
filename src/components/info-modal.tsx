@@ -17,10 +17,10 @@ export function InfoModal({ onClose }: InfoModalProps) {
       />
 
       {/* Modal */}
-      <div className="relative bg-background border border-border rounded-xl shadow-lg max-w-md w-full mx-4 p-6">
+      <div className="relative bg-zinc-900 border border-zinc-700 rounded-xl shadow-lg max-w-md w-full mx-4 p-6 text-zinc-50">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors"
+          className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-50 transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
@@ -30,10 +30,10 @@ export function InfoModal({ onClose }: InfoModalProps) {
         {/* Open Source Section */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-2">
-            <Github className="w-5 h-5 text-primary" />
+            <Github className="w-5 h-5 text-emerald-400" />
             <h3 className="font-medium">Open Source</h3>
           </div>
-          <p className="text-muted-foreground text-sm mb-3">
+          <p className="text-zinc-400 text-sm mb-3">
             StrudelLM is open source! Check out the code, run it yourself, or
             contribute.
           </p>
@@ -42,7 +42,7 @@ export function InfoModal({ onClose }: InfoModalProps) {
               href={config.githubRepo}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-muted hover:bg-muted/80 rounded-lg transition-colors text-sm"
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors text-sm"
             >
               <Github className="w-4 h-4" />
               View on GitHub
@@ -51,7 +51,7 @@ export function InfoModal({ onClose }: InfoModalProps) {
               href={config.githubNewIssue}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 px-4 py-2 border border-border hover:bg-muted/50 rounded-lg transition-colors text-sm"
+              className="flex items-center justify-center gap-2 px-4 py-2 border border-zinc-700 hover:bg-zinc-800/50 rounded-lg transition-colors text-sm"
             >
               <ExternalLink className="w-4 h-4" />
               Report an Issue
@@ -60,9 +60,9 @@ export function InfoModal({ onClose }: InfoModalProps) {
         </div>
 
         {/* Strudel Docs Section */}
-        <div className="mb-6 pb-6 border-b border-border">
+        <div className="mb-6 pb-6 border-b border-zinc-700">
           <h3 className="font-medium mb-2">Learn Strudel</h3>
-          <p className="text-muted-foreground text-sm mb-3">
+          <p className="text-zinc-400 text-sm mb-3">
             New to Strudel? Check out the official documentation to learn the
             basics of live coding music.
           </p>
@@ -70,7 +70,7 @@ export function InfoModal({ onClose }: InfoModalProps) {
             href="https://strudel.cc/learn/getting-started/"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 px-4 py-2 border border-border hover:bg-muted/50 rounded-lg transition-colors text-sm"
+            className="flex items-center justify-center gap-2 px-4 py-2 border border-zinc-700 hover:bg-zinc-800/50 rounded-lg transition-colors text-sm"
           >
             <ExternalLink className="w-4 h-4" />
             Strudel Documentation
@@ -86,14 +86,14 @@ export function InfoModal({ onClose }: InfoModalProps) {
               className="h-20"
             />
           </div>
-          <p className="text-muted-foreground text-sm text-center mb-3">
+          <p className="text-zinc-400 text-sm text-center mb-3">
             Curious how to build AI-powered apps like this?
           </p>
           <a
             href="https://docs.tambo.co"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg transition-colors text-sm"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-500 text-zinc-950 hover:bg-emerald-400 rounded-lg transition-colors text-sm"
           >
             <ExternalLink className="w-4 h-4" />
             Learn More About Tambo
@@ -103,7 +103,7 @@ export function InfoModal({ onClose }: InfoModalProps) {
         {/* Close button */}
         <button
           onClick={onClose}
-          className="w-full mt-6 px-4 py-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors text-sm"
+          className="w-full mt-6 px-4 py-2 text-zinc-400 hover:text-zinc-50 hover:bg-zinc-800 rounded-lg transition-colors text-sm"
         >
           Close
         </button>

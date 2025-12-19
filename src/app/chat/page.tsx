@@ -58,15 +58,38 @@ const BETA_MODAL_SHOWN_KEY = "strudel-beta-modal-shown-v1";
 
 /**
  * Context helper that provides the current Strudel REPL state to the AI.
- * This allows the AI to see what code is currently in the editor.
+ * This allows the AI to see what code is currently in the editor and any errors.
  */
 const strudelContextHelper = () => {
   const service = StrudelService.instance();
   const state = service.getReplState();
 
+  const evalError = state?.evalError;
+  const schedulerError = state?.schedulerError;
+  const missingSample = state?.missingSample;
+
+  // Format error message if present
+  let errorMessage: string | null = null;
+  if (evalError) {
+    errorMessage =
+      typeof evalError === "string" ? evalError : evalError.message;
+  } else if (schedulerError) {
+    errorMessage =
+      typeof schedulerError === "string"
+        ? schedulerError
+        : schedulerError.message;
+  }
+
   return {
     currentCode: state?.code ?? "",
     isPlaying: state?.started ?? false,
+    // Include error info so AI knows when something is broken
+    error: errorMessage,
+    missingSample: missingSample ?? null,
+    // Instruction for AI: if there's an error, use updateRepl to fix it
+    instruction: errorMessage
+      ? "There is an error in the current code. Use the updateRepl tool with corrected code to fix it, then explain to the user what you did."
+      : null,
   };
 };
 

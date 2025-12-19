@@ -94,7 +94,7 @@ export function SidebarContent({ children }: { children: React.ReactNode }) {
   return (
     <div
       className={cn(
-        "h-full border-l border-border flex flex-col relative",
+        "h-full border-l border-border flex flex-col relative bg-background",
         {
           "transition-all duration-300": !isResizing,
           "cursor-col-resize select-none": isResizing

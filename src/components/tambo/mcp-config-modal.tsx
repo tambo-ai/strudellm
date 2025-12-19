@@ -331,9 +331,9 @@ function MyApp() {
 
           {/* Success Message */}
           {savedSuccess && (
-            <div className="mb-6 p-3 bg-green-50 border border-green-200 text-green-800 rounded-lg text-sm animate-in slide-in-from-top-1 duration-200">
+            <div className="mb-6 p-3 bg-success/10 border border-success/30 text-success rounded-lg text-sm animate-in slide-in-from-top-1 duration-200">
               <div className="flex items-center">
-                <span className="text-green-600 mr-2">✓</span>
+                <span className="text-success mr-2">✓</span>
                 Servers saved to browser storage
               </div>
             </div>
@@ -355,7 +355,7 @@ function MyApp() {
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center mb-1">
-                          <div className="w-2 h-2 bg-green-500 rounded-full mr-3 flex-shrink-0"></div>
+                          <div className="w-2 h-2 bg-success rounded-full mr-3 flex-shrink-0"></div>
                           <span className="text-foreground font-medium truncate">
                             {serverInfo.url}
                           </span>

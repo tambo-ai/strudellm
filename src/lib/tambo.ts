@@ -16,8 +16,26 @@
 import type { TamboComponent, TamboTool } from "@tambo-ai/react";
 import { validateAndUpdateRepl } from "@/strudel/tools/validateAndUpdateRepl";
 import { listSamples } from "@/strudel/tools/listSamples";
-import { MultiSelectForm, multiSelectFormSchema } from "@/components/tambo/multi-select-form";
-import { FeedbackForm, feedbackFormSchema } from "@/components/tambo/feedback-form";
+import {
+  MultiSelectForm,
+  multiSelectFormSchema,
+} from "@/components/tambo/multi-select-form";
+import {
+  FeedbackForm,
+  feedbackFormSchema,
+} from "@/components/tambo/feedback-form";
+import {
+  ThemePicker,
+  themePickerSchema,
+} from "@/components/tambo/theme-picker";
+import {
+  KeybindingsPicker,
+  keybindingsPickerSchema,
+} from "@/components/tambo/keybindings-picker";
+import {
+  FontSettings,
+  fontSettingsSchema,
+} from "@/components/tambo/font-settings";
 
 /**
  * tools
@@ -45,5 +63,26 @@ export const components: TamboComponent[] = [
       "Render this when the user is unhappy, frustrated, or asking for something the app does not support (bug reports, missing features, ‘this doesn’t work’, ‘I can’t do X’, etc.). Use it as the assistant response to collect actionable feedback. Fill `title` (5–10 words) and `body` (a short paragraph describing what they tried, expected, and what happened). If the user is signed in, submitting sends a support email; if they’re signed out, they’ll be prompted to log in and can instead open a pre-filled GitHub issue (requires at least ~10 characters of detail).",
     component: FeedbackForm,
     propsSchema: feedbackFormSchema,
+  },
+  {
+    name: "ThemePicker",
+    description:
+      "Editor theme selector. Use filter='dark' or filter='light' to show only dark/light themes. Only set theme prop if user explicitly requests a specific theme (dracula, tokyo-night, nord, github-light, solarized-light, one-light). Use for 'change theme', 'dark mode', 'light mode', 'use dracula', etc.",
+    component: ThemePicker,
+    propsSchema: themePickerSchema,
+  },
+  {
+    name: "KeybindingsPicker",
+    description:
+      "Editor keybindings selector (default, vim, emacs, vscode). Requires runtime restart. Use for 'vim mode', 'use emacs keybindings', etc.",
+    component: KeybindingsPicker,
+    propsSchema: keybindingsPickerSchema,
+  },
+  {
+    name: "FontSettings",
+    description:
+      "Editor font family and size settings. Use for 'change font', 'make text bigger', 'use Fira Code', 'increase font size', etc.",
+    component: FontSettings,
+    propsSchema: fontSettingsSchema,
   },
 ];

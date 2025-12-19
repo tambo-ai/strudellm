@@ -406,11 +406,11 @@ const ToolcallInfo = React.forwardRef<HTMLDivElement, ToolcallInfoProps>(
             )}
           >
             {hasToolError ? (
-              <X className="w-3 h-3 text-bold text-red-500" />
+              <X className="w-3 h-3 text-bold text-destructive" />
             ) : isLoading ? (
               <Loader2 className="w-3 h-3 text-muted-foreground text-bold animate-spin" />
             ) : (
-              <Check className="w-3 h-3 text-bold text-green-500" />
+              <Check className="w-3 h-3 text-bold text-success" />
             )}
             <span>{toolStatusMessage}</span>
             <ChevronDown

@@ -46,7 +46,7 @@ export default function LandingPage() {
         <div className="relative z-10 max-w-4xl mx-auto text-center">
           {/* Logo/Title */}
           <h1 className="text-5xl md:text-7xl font-bold mb-6 tracking-tight">
-            <span className="text-primary">Strudel</span>
+            <span className="text-success">Strudel</span>
             <span className="text-foreground">LM</span>
           </h1>
 
@@ -64,7 +64,7 @@ export default function LandingPage() {
           {/* CTA Button */}
           <Link
             href="/chat"
-            className="inline-flex items-center gap-2 px-8 py-4 bg-primary text-primary-foreground font-medium rounded-xl text-lg transition-all duration-200 hover:opacity-90 hover:scale-[1.02] active:scale-[0.98]"
+            className="inline-flex items-center gap-2 px-8 py-4 bg-success text-success-foreground font-medium rounded-xl text-lg transition-all duration-200 hover:bg-success/90 hover:scale-[1.02] active:scale-[0.98]"
           >
             Start Creating
             <svg
@@ -86,7 +86,7 @@ export default function LandingPage() {
       </main>
 
       {/* Video Section - uncomment when video asset is ready
-      <section className="px-6 py-16 bg-card/50">
+      <section className="px-6 py-16 bg-muted/50">
         <div className="max-w-4xl mx-auto">
           <h2 className="text-2xl md:text-3xl font-semibold text-center mb-8">
             See it in action
@@ -245,7 +245,7 @@ export default function LandingPage() {
               href="https://strudel.cc"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-primary hover:underline"
+              className="text-success hover:underline"
             >
               Strudel
             </a>{" "}
@@ -254,7 +254,7 @@ export default function LandingPage() {
               href="https://tambo.co"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-primary hover:underline"
+              className="text-success hover:underline"
             >
               Tambo
             </a>
@@ -280,7 +280,7 @@ function FeatureCard({
 }) {
   return (
     <div className="p-6 rounded-xl bg-card border border-border">
-      <h3 className="text-lg font-medium mb-2 text-foreground">{title}</h3>
+      <h3 className="text-lg font-medium mb-2 text-card-foreground">{title}</h3>
       <p className="text-muted-foreground text-sm leading-relaxed">
         {description}
       </p>

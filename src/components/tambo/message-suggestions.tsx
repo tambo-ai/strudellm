@@ -260,7 +260,7 @@ const MessageSuggestionsStatus = React.forwardRef<
     >
       {/* Error state */}
       {error && (
-        <div className="p-2 rounded-md text-sm bg-red-50 text-red-500">
+        <div className="p-2 rounded-md text-sm bg-destructive/10 text-destructive">
           <p>{error.message}</p>
         </div>
       )}

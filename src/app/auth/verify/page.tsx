@@ -81,7 +81,7 @@ function VerifyContent() {
 
         {status === "success" && (
           <>
-            <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
+            <CheckCircle className="w-12 h-12 text-success mx-auto mb-4" />
             <h1 className="text-xl font-semibold mb-2">Success!</h1>
             <p className="text-muted-foreground">
               You&apos;re signed in. Redirecting...
