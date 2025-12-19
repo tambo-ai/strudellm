@@ -68,9 +68,7 @@ export default function LandingPage() {
                 src="https://github.com/user-attachments/assets/6f88f3b3-4be2-41fe-b77e-199213811278"
                 type="video/mp4"
               />
-              <p className="flex h-full items-center justify-center bg-black text-sm text-muted-foreground">
-                Your browser does not support the video tag.
-              </p>
+              Your browser does not support the video tag.
             </video>
           </div>
 
