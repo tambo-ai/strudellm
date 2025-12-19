@@ -45,18 +45,37 @@ function buildGithubIssueBody({
   return `${cleanedBody}\n\n${metaLine}\n`;
 }
 
-function getSafeGithubNewIssueBase(raw: string): string | null {
+type GithubNewIssueBaseResult =
+  | { ok: true; base: string }
+  | {
+      ok: false;
+      raw: string;
+      reason:
+        | "UNPARSEABLE_URL"
+        | "UNEXPECTED_PROTOCOL"
+        | "UNEXPECTED_HOST"
+        | "UNEXPECTED_PATH";
+    };
+
+function getSafeGithubNewIssueBase(raw: string): GithubNewIssueBaseResult {
   try {
     const url = new URL(raw);
 
-    if (url.protocol !== "https:" || url.hostname !== "github.com") return null;
-    if (!url.pathname.endsWith("/issues/new")) return null;
+    if (url.protocol !== "https:") {
+      return { ok: false, raw, reason: "UNEXPECTED_PROTOCOL" };
+    }
+    if (url.hostname !== "github.com") {
+      return { ok: false, raw, reason: "UNEXPECTED_HOST" };
+    }
+    if (!url.pathname.endsWith("/issues/new")) {
+      return { ok: false, raw, reason: "UNEXPECTED_PATH" };
+    }
 
     url.hash = "";
     url.search = "";
-    return url.toString().replace(/\?$/, "");
+    return { ok: true, base: url.toString().replace(/\?$/, "") };
   } catch {
-    return null;
+    return { ok: false, raw, reason: "UNPARSEABLE_URL" };
   }
 }
 
@@ -118,7 +137,10 @@ async function parseFeedbackError(res: Response): Promise<{
         : undefined,
   };
 
-  return { status: res.status, payload, text: null };
+  const text =
+    payload.message || payload.error ? null : JSON.stringify(data).slice(0, 1000);
+
+  return { status: res.status, payload, text };
 }
 
 export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
@@ -180,8 +202,8 @@ export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
       if (cleanedBody.length < FEEDBACK_BODY_MIN_LENGTH) return null;
       if (cleanedTitle.length < FEEDBACK_TITLE_MIN_LENGTH) return null;
 
-      const base = getSafeGithubNewIssueBase(config.githubNewIssue);
-      if (!base) {
+      const baseResult = getSafeGithubNewIssueBase(config.githubNewIssue);
+      if (!baseResult.ok) {
         if (
           process.env.NODE_ENV !== "production" &&
           !didWarnInvalidGithubNewIssueBaseRef.current
@@ -189,10 +211,16 @@ export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
           didWarnInvalidGithubNewIssueBaseRef.current = true;
           console.warn(
             "Invalid config.githubNewIssue; expected https://github.com/.../issues/new",
+            {
+              reason: baseResult.reason,
+              raw: baseResult.raw,
+            },
           );
         }
         return null;
       }
+
+      const base = baseResult.base;
 
       const params = new URLSearchParams();
       params.set("title", cleanedTitle);
