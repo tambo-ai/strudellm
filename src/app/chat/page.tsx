@@ -283,7 +283,10 @@ function AppContent() {
   const lastContextKeyRef = React.useRef<string | null>(null);
   const authIdentity = useAuthIdentity();
   const contextKeyState = useContextKey();
-  const identityReady = contextKeyState.isReady && !authIdentity.isPending;
+  // We intentionally wait for Better Auth identity to settle before querying threads,
+  // to avoid fetching under a transient anonymous identity during session refresh.
+  const contextKeyAndIdentityReady =
+    contextKeyState.isReady && !authIdentity.isPending;
   const { isPending } = useLoadingState();
   const isAuthenticated = useIsAuthenticated();
   const {
@@ -306,18 +309,20 @@ function AppContent() {
     useTamboThread();
   const { generationStage } = useTambo();
   const { data: threadList, isSuccess: threadListLoaded } = useTamboThreadList(
-    { contextKey: identityReady ? contextKeyState.contextKey : undefined },
-    { enabled: identityReady },
+    {
+      contextKey: contextKeyAndIdentityReady ? contextKeyState.contextKey : undefined,
+    },
+    { enabled: contextKeyAndIdentityReady },
   );
 
   React.useEffect(() => {
-    if (!identityReady) return;
+    if (!contextKeyAndIdentityReady) return;
     if (lastContextKeyRef.current === contextKeyState.contextKey) return;
     lastContextKeyRef.current = contextKeyState.contextKey;
     // Context key changes imply a user identity change (login/logout). Reset per-thread initialization
     // so we re-select/create threads under the new scope.
     setThreadInitialized(false);
-  }, [identityReady, contextKeyState.contextKey]);
+  }, [contextKeyAndIdentityReady, contextKeyState.contextKey]);
 
   // Track AI generation state to lock editor during updates
   React.useEffect(() => {
@@ -344,7 +349,12 @@ function AppContent() {
 
   // Initialize: select most recent thread or create new
   React.useEffect(() => {
-    if (!identityReady || !strudelIsReady || !threadListLoaded || threadInitialized)
+    if (
+      !contextKeyAndIdentityReady ||
+      !strudelIsReady ||
+      !threadListLoaded ||
+      threadInitialized
+    )
       return;
 
     const existingThreads = threadList?.items ?? [];
@@ -355,7 +365,7 @@ function AppContent() {
     }
     setThreadInitialized(true);
   }, [
-    identityReady,
+    contextKeyAndIdentityReady,
     strudelIsReady,
     threadListLoaded,
     threadInitialized,
@@ -489,7 +499,11 @@ function TamboAuthedProvider({
   apiKey: string;
   children: React.ReactNode;
 }) {
-  const { userToken } = useAuthIdentity();
+  const { userId, userToken } = useAuthIdentity();
+
+  if (process.env.NODE_ENV !== "production" && userId && !userToken) {
+    console.warn("TamboAuthedProvider: userId present but userToken missing");
+  }
 
   return (
     <TamboProvider
