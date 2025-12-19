@@ -131,7 +131,9 @@ let nonSecureCounter = 0;
 let loggedRandomUuidFailure = false;
 let loggedGetRandomValuesFailure = false;
 
-const bytesToUuidV4 = (bytes: Uint8Array): string => {
+// Formats 16 bytes into a UUID-like opaque string.
+// Input bytes may be non-cryptographic and must not be used for any security-sensitive purpose.
+const bytesToOpaqueUuidLikeString = (bytes: Uint8Array): string => {
   const b = bytes.slice(0, 16);
   b[6] = (b[6] & 0x0f) | 0x40;
   b[8] = (b[8] & 0x3f) | 0x80;
@@ -159,7 +161,7 @@ const bestEffortNonSecureId = (): string => {
     if (crypto?.getRandomValues) {
       const bytes = new Uint8Array(16);
       crypto.getRandomValues(bytes);
-      return bytesToUuidV4(bytes);
+      return bytesToOpaqueUuidLikeString(bytes);
     }
   } catch (error) {
     if (process.env.NODE_ENV !== "production" && !loggedGetRandomValuesFailure) {
@@ -185,7 +187,7 @@ const bestEffortNonSecureId = (): string => {
     bytes[i] = Math.floor(Math.random() * 256);
   }
 
-  return bytesToUuidV4(bytes);
+  return bytesToOpaqueUuidLikeString(bytes);
 };
 
 // Get or create anonymous context key (for users not logged in)
