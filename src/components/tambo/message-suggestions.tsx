@@ -359,10 +359,10 @@ const MessageSuggestionsList = React.forwardRef<
           placeholders.map((_, index) => (
             <div
               key={`placeholder-${index}`}
-              className="py-2 px-2.5 rounded-2xl text-xs border border-flat bg-muted/20 text-transparent animate-pulse"
+              className="py-2 px-2.5 rounded-2xl text-xs border border-border/50 bg-muted/30 min-w-[80px] animate-pulse flex items-center justify-center"
               data-placeholder-index={index}
             >
-              <span className="invisible">Placeholder</span>
+              <span className="block h-3 bg-muted-foreground/20 rounded w-16"></span>
             </div>
           ))}
     </div>

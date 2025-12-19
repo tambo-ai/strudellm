@@ -59,21 +59,16 @@ export function InfoModal({ onClose }: InfoModalProps) {
           </div>
         </div>
 
-        {/* Strudel Docs Section */}
+        {/* Strudel Docs Link */}
         <div className="mb-6 pb-6 border-b border-zinc-700">
-          <h3 className="font-medium mb-2">Learn Strudel</h3>
-          <p className="text-zinc-400 text-sm mb-3">
-            New to Strudel? Check out the official documentation to learn the
-            basics of live coding music.
-          </p>
           <a
             href="https://strudel.cc/learn/getting-started/"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 px-4 py-2 border border-zinc-700 hover:bg-zinc-800/50 rounded-lg transition-colors text-sm"
+            className="inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-zinc-50 transition-colors"
           >
-            <ExternalLink className="w-4 h-4" />
-            Strudel Documentation
+            Learn more about Strudel
+            <ExternalLink className="w-3 h-3" />
           </a>
         </div>
 
@@ -87,16 +82,16 @@ export function InfoModal({ onClose }: InfoModalProps) {
             />
           </div>
           <p className="text-zinc-400 text-sm text-center mb-3">
-            Curious how to build AI-powered apps like this?
+            Add Tambo&apos;s AI agent to your app.
           </p>
           <a
-            href="https://docs.tambo.co"
+            href="https://github.com/tambo-ai/tambo"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-500 text-zinc-950 hover:bg-emerald-400 rounded-lg transition-colors text-sm"
           >
-            <ExternalLink className="w-4 h-4" />
-            Learn More About Tambo
+            <Github className="w-4 h-4" />
+            View on GitHub
           </a>
         </div>
 
