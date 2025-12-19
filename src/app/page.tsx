@@ -75,10 +75,7 @@ export default function LandingPage() {
                 src="https://github.com/user-attachments/assets/6f88f3b3-4be2-41fe-b77e-199213811278"
                 type="video/mp4"
               />
-              <p className="bg-background/80 p-4 text-center text-sm text-muted-foreground">
-                Demo video (StrudelLM live coding with AI) is not supported in this
-                browser.
-              </p>
+              Demo video (StrudelLM live coding with AI) is not supported in this browser.
             </video>
           </div>
 
