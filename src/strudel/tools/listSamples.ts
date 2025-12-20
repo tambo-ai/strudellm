@@ -31,7 +31,7 @@ export const listSamples: TamboTool = {
     };
 
     // Known synth waveforms
-    const synthWaveforms = ['sine', 'sin', 'triangle', 'tri', 'square', 'sqr', 'sawtooth', 'saw', 'supersaw', 'supersquare', 'fm'];
+    const synthWaveforms = ['sine', 'sin', 'triangle', 'tri', 'square', 'sqr', 'sawtooth', 'saw', 'supersaw', 'pulse', 'sbd', 'bytebeat', 'white', 'pink', 'brown', 'crackle'];
 
     // Drum machine prefixes (from tidal-drum-machines)
     const drumPrefixes = ['roland', 'tr', 'linn', 'oberheim', 'dmx', 'emu', 'alesis', 'boss', 'korg', 'simmons', 'casio', 'yamaha', 'akai'];

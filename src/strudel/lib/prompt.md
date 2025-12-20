@@ -11,7 +11,7 @@ Don't output explanations or commentary to the thread, just use the tools to upd
 
 Use the `listSamples` tool when you need specific samples you're unsure about. However, these core sounds are always available and don't need verification:
 
-**Always-available synths:** sine, triangle, square, sawtooth, supersaw, supersquare, fm, fmpiano
+**Always-available synths:** sine, triangle, square, sawtooth, supersaw, pulse
 **Always-available drums:** bd, sd, hh, oh, cp, rim (use with .bank() for specific machines)
 **Common banks:** RolandTR808, RolandTR909, LinnDrum, AlesisHR16
 
@@ -561,8 +561,8 @@ Use `listSamples` to discover available sounds. Here's what categories exist:
 
 ## Built-in Synth Oscillators (always available)
 - **Basic waves:** sine, triangle, square, sawtooth (or sin, tri, sqr, saw)
-- **Super (detuned):** supersaw, supersquare
-- **FM synths:** fm, fmpiano
+- **Super (detuned):** supersaw
+- **Other:** pulse, sbd (synthetic bass drum), bytebeat
 - **Noise:** white, pink, brown, crackle
 
 ## Sample Categories (use listSamples to get exact names)
@@ -605,7 +605,7 @@ $bass: note("g1 ~ g1 g1, ~ ~ eb1 ~")
   .distort(0.15)
 
 $pad: note("<[g3,bb3,d4] [eb3,g3,bb3] [c3,eb3,g3] [d3,f3,a3]>")
-  .s("supersquare")
+  .s("supersaw")
   .lpf(1200)
   .gain(0.25)
   .attack(0.2)
@@ -681,7 +681,7 @@ $bass: note("e1 ~ [e1 g1] ~").s("sawtooth").lpf(sine.range(200, 800).slow(4)).di
 ```javascript
 setCpm(70/4)
 $pad: note("<[c3,e3,g3,b3] [a2,c3,e3,g3]>")
-  .s("supersquare")
+  .s("supersaw")
   .lpf(sine.range(800, 2000).slow(16))
   .attack(0.5).release(1)
   .room(0.8).gain(0.2)
