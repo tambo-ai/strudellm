@@ -23,29 +23,12 @@ function VerifyContent() {
       return;
     }
 
-    // Build Jazz auth header from stored credentials
-    const headers: Record<string, string> = {};
-    const stored = localStorage.getItem("jazz-logged-in-secret");
-    if (stored) {
-      try {
-        const credentials = JSON.parse(stored);
-        headers["x-jazz-auth"] = JSON.stringify({
-          accountID: credentials.accountID,
-          secretSeed: credentials.secretSeed,
-          accountSecret: credentials.accountSecret,
-        });
-      } catch (e) {
-        console.error("Failed to parse Jazz credentials:", e);
-      }
-    }
-
-    // Use authClient.$fetch directly with GET method to ensure correct request
+    // Use authClient.$fetch directly with GET method to verify the magic link token
     authClient
       .$fetch(
         `/magic-link/verify?token=${encodeURIComponent(token)}&callbackURL=${encodeURIComponent(callbackURL)}`,
         {
           method: "GET",
-          headers,
         },
       )
       .then(({ error: fetchError }) => {

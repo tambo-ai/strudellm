@@ -1,7 +1,6 @@
 import { betterAuth } from "better-auth";
 import { magicLink } from "better-auth/plugins";
 import Database from "better-sqlite3";
-import { jazzPlugin } from "jazz-tools/better-auth/auth/server";
 import { Resend } from "resend";
 import { Pool } from "pg";
 import { PostgresDialect } from "kysely";
@@ -33,7 +32,6 @@ async function addUserToResendSegment(email: string | null | undefined) {
 }
 
 let migrationsPromise: Promise<void> | null = null;
-let schemaPatchPromise: Promise<void> | null = null;
 
 async function ensureMigrations(dialect: PostgresDialect) {
   if (migrationsPromise) return migrationsPromise;
@@ -44,22 +42,6 @@ async function ensureMigrations(dialect: PostgresDialect) {
   return migrationsPromise;
 }
 
-async function ensureJazzColumns(pool: Pool) {
-  if (schemaPatchPromise) return schemaPatchPromise;
-  schemaPatchPromise = (async () => {
-    try {
-      await pool.query(
-        'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "accountID" text',
-      );
-      await pool.query(
-        'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "encryptedCredentials" text',
-      );
-    } catch (error) {
-      console.error("Failed to ensure Jazz columns on user table", error);
-    }
-  })();
-  return schemaPatchPromise;
-}
 
 // Track if database is ready for use
 let dbReadyPromise: Promise<void> | null = null;
@@ -75,9 +57,7 @@ function getDatabaseConfig() {
 
     // Run Better Auth migrations once (creates user/session tables)
     // Store the promise so we can await it if needed before auth operations
-    dbReadyPromise = ensureMigrations(dialect).then(() =>
-      ensureJazzColumns(pool),
-    );
+    dbReadyPromise = ensureMigrations(dialect);
 
     return {
       dialect,
@@ -111,7 +91,6 @@ export const auth = betterAuth({
     },
   },
   plugins: [
-    jazzPlugin(),
     magicLink({
       sendMagicLink: async ({ email, url }) => {
         // Transform the API verification URL to our custom client-side verification page
@@ -122,7 +101,6 @@ export const auth = betterAuth({
         const callbackURL = parsedUrl.searchParams.get("callbackURL") || "/";
 
         // Build the custom verification URL that handles verification client-side
-        // This ensures the x-jazz-auth header is sent with the verification request
         const customUrl = `${parsedUrl.origin}/auth/verify?token=${token}&callbackURL=${encodeURIComponent(callbackURL)}`;
 
         const emailHtml = `

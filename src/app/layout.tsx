@@ -1,7 +1,13 @@
 import { Geist, Geist_Mono, Fira_Code, JetBrains_Mono } from "next/font/google";
 import Script from "next/script";
+import type { Metadata } from "next";
 import "./globals.css";
 import { STORED_THEME_IDS, THEME_STORAGE_KEY } from "@/lib/editor-theme";
+
+export const metadata: Metadata = {
+  title: "StrudelLM - Live Coding with AI",
+  description: "Live coding music with AI assistance powered by Strudel",
+};
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

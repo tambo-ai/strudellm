@@ -83,4 +83,4 @@ Open [localhost:3000](http://localhost:3000) and start making music.
 
 - [Tambo](https://tambo.co) - AI agent framework
 - [Strudel](https://strudel.cc/) - Live coding music environment
-- [Jazz](https://jazz.tools/) - Sync and persistence
+- [Better Auth](https://www.better-auth.com/) - Authentication
