@@ -1,7 +1,7 @@
 "use client";
 
-import { signOut, useSession } from "@/lib/auth-client";
-import { LogIn, LogOut, User, Loader2 } from "lucide-react";
+import { useSession } from "@/lib/auth-client";
+import { LogIn, Loader2, CheckCircle } from "lucide-react";
 import { useState } from "react";
 import { AuthModal } from "./auth-modal";
 
@@ -19,19 +19,10 @@ export function AuthButton() {
 
   if (session?.user) {
     return (
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-muted-foreground flex items-center gap-1.5">
-          <User className="w-3 h-3" />
-          {session.user.email}
-        </span>
-        <button
-          onClick={() => signOut()}
-          className="flex items-center gap-1.5 px-2 py-1 text-sm text-muted-foreground hover:text-foreground hover:bg-backdrop rounded-md transition-colors"
-        >
-          <LogOut className="w-3 h-3" />
-          Sign out
-        </button>
-      </div>
+      <span className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground">
+        <CheckCircle className="w-4 h-4 text-green-500" />
+        on waitlist
+      </span>
     );
   }
 
