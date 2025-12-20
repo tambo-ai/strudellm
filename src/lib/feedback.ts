@@ -1,0 +1,4 @@
+export const FEEDBACK_TITLE_MIN_LENGTH = 3;
+export const FEEDBACK_TITLE_MAX_LENGTH = 80;
+export const FEEDBACK_BODY_MIN_LENGTH = 10;
+export const FEEDBACK_BODY_MAX_LENGTH = 4000;

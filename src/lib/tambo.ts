@@ -21,6 +21,10 @@ import {
   multiSelectFormSchema,
 } from "@/components/tambo/multi-select-form";
 import {
+  FeedbackForm,
+  feedbackFormSchema,
+} from "@/components/tambo/feedback-form";
+import {
   ThemePicker,
   themePickerSchema,
 } from "@/components/tambo/theme-picker";
@@ -52,6 +56,13 @@ export const components: TamboComponent[] = [
       "A general-purpose multi-select form component. Renders labeled groups of toggle buttons where users can select multiple options within each group. Uses Tambo state to track user selections in AI context. Use for any scenario where the user needs to pick from categorized options (sounds, features, settings, categories, tags, etc.).",
     component: MultiSelectForm,
     propsSchema: multiSelectFormSchema,
+  },
+  {
+    name: "FeedbackForm",
+    description:
+      "Render this when the user is unhappy, frustrated, or asking for something the app does not support (bug reports, missing features, ‘this doesn’t work’, ‘I can’t do X’, etc.). Use it as the assistant response to collect actionable feedback. Fill `title` (5–10 words) and `body` (a short paragraph describing what they tried, expected, and what happened). If the user is signed in, submitting sends a support email; if they’re signed out, they’ll be prompted to log in and can instead open a pre-filled GitHub issue (requires at least ~10 characters of detail).",
+    component: FeedbackForm,
+    propsSchema: feedbackFormSchema,
   },
   {
     name: "ThemePicker",

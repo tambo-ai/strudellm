@@ -1,0 +1,498 @@
+"use client";
+
+import { config } from "@/lib/config";
+import {
+  FEEDBACK_BODY_MAX_LENGTH,
+  FEEDBACK_BODY_MIN_LENGTH,
+  FEEDBACK_TITLE_MAX_LENGTH,
+  FEEDBACK_TITLE_MIN_LENGTH,
+} from "@/lib/feedback";
+import { cn } from "@/lib/utils";
+import { useSession } from "@/lib/auth-client";
+import { AuthModal } from "@/components/auth/auth-modal";
+import { useTamboComponentState, useTamboStreamStatus } from "@tambo-ai/react";
+import { ExternalLink } from "lucide-react";
+import * as React from "react";
+import { z } from "zod/v3";
+
+export const feedbackFormSchema = z.object({
+  title: z
+    .string()
+    .min(FEEDBACK_TITLE_MIN_LENGTH)
+    .max(FEEDBACK_TITLE_MAX_LENGTH)
+    .describe(
+      "A short feedback title (aim for 5–10 words) describing the user’s problem or request. Used for either the support email subject (when signed in) or the GitHub issue title (when signed out).",
+    ),
+  body: z
+    .string()
+    .min(FEEDBACK_BODY_MIN_LENGTH)
+    .max(FEEDBACK_BODY_MAX_LENGTH)
+    .describe(
+      "A longer description of what the user is trying to do, what they expected, and what happened instead. Used for either the support email body (when signed in) or the GitHub issue body (when signed out).",
+    ),
+});
+
+export type FeedbackFormProps = z.infer<typeof feedbackFormSchema>;
+
+function buildGithubIssueBody({
+  body,
+}: {
+  body: string;
+}): string {
+  const cleanedBody = body.trim() || "(no additional details provided)";
+  const metaLine = "<!-- submitted-via: StrudelLM FeedbackForm -->";
+
+  return `${cleanedBody}\n\n${metaLine}\n`;
+}
+
+type GithubNewIssueBaseResult =
+  | { ok: true; base: string }
+  | {
+      ok: false;
+      raw: string;
+      reason:
+        | "UNPARSEABLE_URL"
+        | "UNEXPECTED_PROTOCOL"
+        | "UNEXPECTED_HOST"
+        | "UNEXPECTED_PATH";
+    };
+
+function getSafeGithubNewIssueBase(raw: string): GithubNewIssueBaseResult {
+  try {
+    const url = new URL(raw);
+
+    if (url.protocol !== "https:") {
+      return { ok: false, raw, reason: "UNEXPECTED_PROTOCOL" };
+    }
+    if (url.hostname !== "github.com") {
+      return { ok: false, raw, reason: "UNEXPECTED_HOST" };
+    }
+    if (!url.pathname.endsWith("/issues/new")) {
+      return { ok: false, raw, reason: "UNEXPECTED_PATH" };
+    }
+
+    url.hash = "";
+    url.search = "";
+    return { ok: true, base: url.toString().replace(/\?$/, "") };
+  } catch {
+    return { ok: false, raw, reason: "UNPARSEABLE_URL" };
+  }
+}
+
+function getDeliveredFlag(data: unknown): boolean | null {
+  if (!data || typeof data !== "object") return null;
+  if (!("delivered" in data)) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("Feedback API response missing delivered flag");
+    }
+    return null;
+  }
+
+  const delivered = (data as { delivered?: unknown }).delivered;
+
+  if (typeof delivered !== "boolean") {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("Feedback API delivered flag is not boolean");
+    }
+    return null;
+  }
+
+  return delivered;
+}
+
+type FeedbackApiErrorPayload = {
+  code?: string;
+  message?: string;
+  error?: string;
+};
+
+async function parseFeedbackError(res: Response): Promise<{
+  status: number;
+  payload: FeedbackApiErrorPayload | null;
+  text: string | null;
+}> {
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    const text = await res.text().catch(() => null);
+    return { status: res.status, payload: null, text };
+  }
+
+  const data: unknown = await res.json().catch(() => null);
+  if (!data || typeof data !== "object") {
+    return { status: res.status, payload: null, text: null };
+  }
+
+  const payload: FeedbackApiErrorPayload = {
+    code:
+      typeof (data as { code?: unknown }).code === "string"
+        ? (data as { code: string }).code
+        : undefined,
+    message:
+      typeof (data as { message?: unknown }).message === "string"
+        ? (data as { message: string }).message
+        : undefined,
+    error:
+      typeof (data as { error?: unknown }).error === "string"
+        ? (data as { error: string }).error
+        : undefined,
+  };
+
+  let text: string | null = null;
+  if (!payload.message && !payload.error) {
+    try {
+      text = JSON.stringify(data).slice(0, 1000);
+    } catch {
+      text = null;
+    }
+  }
+
+  return { status: res.status, payload, text };
+}
+
+export const FeedbackForm = React.forwardRef<HTMLDivElement, FeedbackFormProps>(
+  ({ title, body }, ref) => {
+    const { streamStatus, propStatus } = useTamboStreamStatus<FeedbackFormProps>();
+    const { data: session } = useSession();
+    const isSignedIn = Boolean(session?.user?.email);
+    const [showAuthModal, setShowAuthModal] = React.useState(false);
+    // Dev-only: keep warnings local to the mounted component and avoid module-level state.
+    const didWarnInvalidGithubNewIssueBaseRef = React.useRef(false);
+
+    const [draftTitle, setDraftTitle] = useTamboComponentState<string>(
+      "draftTitle",
+      title ?? "",
+    );
+    const [draftBody, setDraftBody] = useTamboComponentState<string>(
+      "draftBody",
+      body ?? "",
+    );
+    const [hasEdited, setHasEdited] = useTamboComponentState<boolean>(
+      "hasEdited",
+      false,
+    );
+    const [isSending, setIsSending] = useTamboComponentState<boolean>(
+      "isSending",
+      false,
+    );
+    const [isSubmitted, setIsSubmitted] = useTamboComponentState<boolean>(
+      "isSubmitted",
+      false,
+    );
+    const [wasDelivered, setWasDelivered] = useTamboComponentState<boolean | null>(
+      "wasDelivered",
+      null,
+    );
+    const [submitError, setSubmitError] = useTamboComponentState<string | null>(
+      "submitError",
+      null,
+    );
+
+    React.useEffect(() => {
+      if (hasEdited || isSubmitted) return;
+      if (!draftTitle && title) setDraftTitle(title);
+      if (!draftBody && body) setDraftBody(body);
+    }, [
+      hasEdited,
+      isSubmitted,
+      draftTitle,
+      draftBody,
+      title,
+      body,
+      setDraftTitle,
+      setDraftBody,
+    ]);
+
+    const githubIssueUrl = React.useMemo(() => {
+      const cleanedTitle = (draftTitle ?? "").trim();
+      const cleanedBody = (draftBody ?? "").trim();
+
+      if (cleanedBody.length < FEEDBACK_BODY_MIN_LENGTH) return null;
+      if (cleanedTitle.length < FEEDBACK_TITLE_MIN_LENGTH) return null;
+
+      const baseResult = getSafeGithubNewIssueBase(config.githubNewIssue);
+      if (!baseResult.ok) {
+        if (
+          process.env.NODE_ENV !== "production" &&
+          !didWarnInvalidGithubNewIssueBaseRef.current
+        ) {
+          didWarnInvalidGithubNewIssueBaseRef.current = true;
+          console.warn(
+            "Invalid config.githubNewIssue; expected https://github.com/.../issues/new",
+            {
+              reason: baseResult.reason,
+              raw: baseResult.raw,
+            },
+          );
+        }
+        return null;
+      }
+
+      const base = baseResult.base;
+
+      const params = new URLSearchParams();
+      params.set("title", cleanedTitle);
+      params.set(
+        "body",
+        buildGithubIssueBody({
+          body: cleanedBody,
+        }),
+      );
+
+      return `${base}?${params.toString()}`;
+    }, [draftTitle, draftBody]);
+
+    const isDisabled = isSubmitted || isSending;
+
+    const onSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (isDisabled) return;
+
+      if (!isSignedIn) {
+        setShowAuthModal(true);
+        return;
+      }
+
+      setSubmitError(null);
+      setIsSending(true);
+      try {
+        const res = await fetch("/api/feedback", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            title: draftTitle ?? "",
+            body: draftBody ?? "",
+          }),
+        });
+
+        if (!res.ok) {
+          const { status, payload, text } = await parseFeedbackError(res);
+          const code = payload?.code;
+
+          if (status === 401 && code === "AUTH_REQUIRED_FOR_FEEDBACK") {
+            setShowAuthModal(true);
+            return;
+          }
+
+          if (payload?.message) throw new Error(payload.message);
+          if (payload?.error) throw new Error(payload.error);
+
+          if (status >= 500) {
+            throw new Error(
+              "Our servers had an issue saving your feedback. Please try again.",
+            );
+          }
+
+          throw new Error(text || "Request failed");
+        }
+
+        const contentType = res.headers.get("content-type") ?? "";
+        if (contentType.includes("application/json")) {
+          const data: unknown = await res.json().catch(() => null);
+          const delivered = getDeliveredFlag(data);
+          if (delivered != null) setWasDelivered(delivered);
+        }
+
+        setIsSubmitted(true);
+      } catch (error) {
+        setSubmitError(
+          error instanceof Error
+            ? error.message
+            : "Failed to submit feedback",
+        );
+      } finally {
+        setIsSending(false);
+      }
+    };
+
+    if (streamStatus.isPending) {
+      return (
+        <div
+          ref={ref}
+          className="w-full rounded-lg border border-border bg-card p-4"
+        >
+          <div className="text-sm text-muted-foreground animate-pulse">
+            Loading...
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div
+        ref={ref}
+        className="w-full rounded-lg border border-border bg-card p-4 space-y-4"
+      >
+        <div className="space-y-1">
+          <h3 className="text-sm font-medium">Send feedback</h3>
+          <p className="text-xs text-muted-foreground">
+            Tell us what went wrong or what you were trying to do.
+          </p>
+        </div>
+
+        <form className="space-y-4" onSubmit={onSubmit}>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground">
+              Title
+            </label>
+            <input
+              value={draftTitle ?? ""}
+              disabled={isDisabled}
+              onChange={(e) => {
+                setHasEdited(true);
+                setDraftTitle(e.target.value);
+              }}
+              className={cn(
+                "w-full px-3 py-2 rounded-lg border bg-background text-foreground focus:outline-none focus:ring-2",
+                "border-border focus:ring-accent",
+                propStatus.title?.isStreaming && "animate-pulse",
+                isDisabled && "opacity-70",
+              )}
+              placeholder="Short summary (5–10 words)"
+              minLength={FEEDBACK_TITLE_MIN_LENGTH}
+              maxLength={FEEDBACK_TITLE_MAX_LENGTH}
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground">
+              Details
+            </label>
+            <textarea
+              value={draftBody ?? ""}
+              disabled={isDisabled}
+              onChange={(e) => {
+                setHasEdited(true);
+                setDraftBody(e.target.value);
+              }}
+              className={cn(
+                "w-full min-h-[120px] px-3 py-2 rounded-lg border bg-background text-foreground focus:outline-none focus:ring-2 resize-y",
+                "border-border focus:ring-accent",
+                propStatus.body?.isStreaming && "animate-pulse",
+                isDisabled && "opacity-70",
+              )}
+              placeholder="What were you trying to do? What did you expect? What happened instead?"
+              minLength={FEEDBACK_BODY_MIN_LENGTH}
+              maxLength={FEEDBACK_BODY_MAX_LENGTH}
+              required
+            />
+          </div>
+
+          {submitError && (
+            <p className="text-xs text-destructive">{submitError}</p>
+          )}
+
+          <div className="space-y-3">
+            {isSignedIn ? (
+              <>
+                <button
+                  type="submit"
+                  disabled={
+                    isDisabled ||
+                    !(draftTitle ?? "").trim() ||
+                    !(draftBody ?? "").trim() ||
+                    streamStatus.isStreaming
+                  }
+                  className={cn(
+                    "w-full px-4 py-2 rounded-md transition-colors",
+                    isSubmitted
+                      ? "bg-muted text-muted-foreground"
+                      : "bg-primary text-primary-foreground hover:bg-primary/90",
+                    "disabled:opacity-50 disabled:cursor-not-allowed",
+                  )}
+                >
+                  {isSubmitted
+                    ? "Submitted"
+                    : isSending
+                      ? "Submitting…"
+                      : "Submit feedback"}
+                </button>
+
+                {isSubmitted && wasDelivered === false && (
+                  <p className="text-xs text-muted-foreground">
+                    Feedback was accepted, but email isn’t configured here.
+                    Please open a GitHub issue so we can track it.
+                  </p>
+                )}
+
+                {githubIssueUrl && (
+                  <>
+                    <p className="text-xs text-muted-foreground">
+                      {isSubmitted
+                        ? "Want this fixed faster? Open a GitHub issue so we can track it."
+                        : submitError
+                          ? "Having trouble sending? Open a GitHub issue so we can track it."
+                          : "Prefer GitHub? Open an issue so we can track this."}
+                    </p>
+                    <a
+                      href={githubIssueUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 w-full px-4 py-2 rounded-md border border-border hover:bg-muted/50 transition-colors"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Open GitHub issue
+                    </a>
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  disabled={isSending || streamStatus.isStreaming}
+                  onClick={() => setShowAuthModal(true)}
+                  className={cn(
+                    "w-full px-4 py-2 rounded-md transition-colors",
+                    "bg-primary text-primary-foreground hover:bg-primary/90",
+                    "disabled:opacity-50 disabled:cursor-not-allowed",
+                  )}
+                >
+                  Log in to send feedback
+                </button>
+
+                <p className="text-xs text-muted-foreground">
+                  Prefer not to log in? Open a GitHub issue and we’ll track it
+                  there.
+                </p>
+
+                {githubIssueUrl ? (
+                  <a
+                    href={githubIssueUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 w-full px-4 py-2 rounded-md border border-border hover:bg-muted/50 transition-colors"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    Open GitHub issue
+                  </a>
+                ) : (
+                  <div className="space-y-1">
+                    <button
+                      type="button"
+                      disabled
+                      className="flex items-center justify-center gap-2 w-full px-4 py-2 rounded-md border border-border text-muted-foreground opacity-60 cursor-not-allowed"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Open GitHub issue
+                    </button>
+                    <p className="text-xs text-muted-foreground">
+                      Add a title and a bit more detail above to enable opening
+                      a GitHub issue.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </form>
+
+        {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
+      </div>
+    );
+  },
+);
+
+FeedbackForm.displayName = "FeedbackForm";
