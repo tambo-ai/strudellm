@@ -9,26 +9,12 @@
  * - StrudelMirror editor attachment and configuration
  */
 
-import { evalScope } from "@strudel/core";
-import { transpiler } from "@strudel/transpiler";
-import {
-  getAudioContext,
-  initAudioOnFirstClick,
-  registerSynthSounds,
-  webaudioOutput,
-} from "@strudel/webaudio";
 import { prebake } from "@/strudel/lib/prebake";
-import {
-  StrudelMirror,
+import type {
   StrudelMirrorOptions,
   StrudelReplState,
 } from "@strudel/codemirror";
-import { getDrawContext, setTheme } from "@strudel/draw";
 import { isSampleErrorMessage as matchesSampleErrorMessage } from "@/strudel/lib/errors";
-import type {
-  StrudelStorageAdapter,
-  ReplSummary,
-} from "@/hooks/use-strudel-storage";
 import { DEFAULT_KEYBINDINGS, getKeybindings } from "@/lib/editor-preferences";
 
 type LoadingCallback = (status: string, progress: number) => void;
@@ -36,7 +22,7 @@ type CodeChangeCallback = (state: StrudelReplState) => void;
 
 type UpdateSource = "ai" | "user";
 
-const DEFAULT_CODE = `// Welcome to StrudelLM!
+export const DEFAULT_CODE = `// Welcome to StrudelLM!
 // Write patterns here or ask the AI for help
 
 // Example: Piano + drums with scope and pianoroll visualizations
@@ -61,7 +47,8 @@ export class StrudelService {
   private isAudioInitialized = false;
 
   // Editor state
-  private editorInstance: StrudelMirror | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private editorInstance: any | null = null;
   private containerElement: HTMLElement | null = null;
   private editorOptions: Omit<StrudelMirrorOptions, "root"> = {};
 
@@ -87,14 +74,8 @@ export class StrudelService {
   private updateOperationId = 0;
   private pendingSchedulerWaitCancel: (() => void) | null = null;
 
-  // Thread/REPL persistence state
-  private currentThreadId: string | null = null;
-  private currentReplId: string | null = null;
   private isInitializing = false;
   private isRestartingEditor = false;
-
-  // Storage adapter (can be swapped for Jazz or localStorage)
-  private storageAdapter: StrudelStorageAdapter | null = null;
 
   private constructor() {}
 
@@ -180,261 +161,11 @@ export class StrudelService {
   };
 
   // ============================================
-  // Code Persistence (REPL/Thread Model)
+  // Code Persistence (Single REPL Model)
   // ============================================
 
-  /**
-   * Set the storage adapter (Jazz or localStorage)
-   * Called from React components that have access to the useStrudelStorage hook
-   */
-  setStorageAdapter(adapter: StrudelStorageAdapter): void {
-    this.storageAdapter = adapter;
-  }
-
-  /**
-   * Check if storage is loaded (Jazz data synced)
-   */
-  get isStorageLoaded(): boolean {
-    return this.storageAdapter?.isLoaded ?? false;
-  }
-
-  /**
-   * Get the current REPL ID
-   */
-  getCurrentReplId(): string | null {
-    return this.currentReplId;
-  }
-
-  /**
-   * Get the REPL ID associated with a thread
-   */
-  getReplIdForThread(threadId: string): string | null {
-    if (this.storageAdapter) {
-      return this.storageAdapter.getThreadReplId(threadId);
-    }
-    return null;
-  }
-
-  /**
-   * Check if a thread is attached to a different REPL than the current one
-   */
-  isThreadOnDifferentRepl(threadId: string): boolean {
-    if (!this.currentReplId) return false;
-    const threadReplId = this.getReplIdForThread(threadId);
-    return threadReplId !== null && threadReplId !== this.currentReplId;
-  }
-
-  /**
-   * Get all REPLs for tab display
-   */
-  getAllRepls(): ReplSummary[] {
-    if (!this.storageAdapter) return [];
-    return this.storageAdapter.getAllRepls();
-  }
-
-  /**
-   * Delete a REPL by its ID
-   */
-  deleteRepl(replId: string): void {
-    if (!this.storageAdapter) return;
-    this.storageAdapter.deleteRepl(replId);
-  }
-
-  /**
-   * Save current code to the active REPL
-   */
-  private saveCode(): void {
-    if (typeof window === "undefined" || !this.currentReplId) return;
-
-    // Use adapter if available
-    if (this.storageAdapter) {
-      this.storageAdapter.saveRepl(this.currentReplId, this._state.code);
-      return;
-    }
-  }
-
-  /**
-   * Load code for a REPL
-   */
-  private loadReplCode(replId: string): string | null {
-    if (this.storageAdapter) {
-      const repl = this.storageAdapter.getRepl(replId);
-      return repl?.code ?? null;
-    }
-    return null;
-  }
-
-  /**
-   * Set the current REPL and load its code
-   */
-  setReplId(replId: string): void {
-    if (replId === this.currentReplId) return;
-
-    // Save current REPL's code before switching
-    if (this.currentReplId) {
-      this.saveCode();
-    }
-
-    this.currentReplId = replId;
-
-    // Update active REPL in storage
-    if (this.storageAdapter) {
-      this.storageAdapter.setActiveReplId(replId);
-    }
-
-    // Load code for the REPL
-    if (this.editorInstance) {
-      const savedCode = this.loadReplCode(replId);
-      if (savedCode) {
-        this.setCode(savedCode);
-      }
-    }
-  }
-
-  /**
-   * Set the current thread ID and ensure it's attached to the current REPL.
-   * If the thread is attached to a different REPL, this will NOT switch REPLs.
-   * Use setReplId() to switch REPLs explicitly.
-   */
-  setThreadId(threadId: string | null): void {
-    if (threadId === this.currentThreadId) return;
-
-    this.currentThreadId = threadId;
-
-    // Attach thread to current REPL if we have one
-    if (threadId && this.currentReplId && this.storageAdapter) {
-      // Only attach if thread doesn't already have a REPL
-      const existingReplId = this.storageAdapter.getThreadReplId(threadId);
-      if (!existingReplId) {
-        this.storageAdapter.attachThreadToRepl(threadId, this.currentReplId);
-      }
-    }
-  }
-
-  /**
-   * Create a new REPL with the given code (or default) and set it as active.
-   * Also attaches the current thread to the new REPL.
-   */
-  createNewRepl(code?: string): string | null {
-    if (!this.storageAdapter) return null;
-
-    // Save current REPL first
-    if (this.currentReplId) {
-      this.saveCode();
-    }
-
-    // Create new REPL
-    const replId = this.storageAdapter.createRepl(code ?? DEFAULT_CODE);
-    this.currentReplId = replId;
-    this.storageAdapter.setActiveReplId(replId);
-
-    // Load the code into the editor
-    if (this.editorInstance) {
-      this.setCode(code ?? DEFAULT_CODE);
-    }
-
-    // Attach current thread to new REPL
-    if (this.currentThreadId) {
-      this.storageAdapter.attachThreadToRepl(this.currentThreadId, replId);
-    }
-
-    return replId;
-  }
-
-  /**
-   * Initialize REPL state - called on app startup.
-   * Loads the active REPL or creates a new one.
-   *
-   * Priority:
-   * 1. Use active REPL from localStorage if it exists in storage with real code
-   * 2. Use the most recently updated REPL from Jazz with real code
-   * 3. For anonymous users: create a new REPL
-   * 4. For authenticated users: wait for Jazz sync (return null, sync will handle it)
-   */
-  initializeRepl(): string | null {
-    if (!this.storageAdapter) {
-      console.log("[Service.initializeRepl] No storage adapter");
-      return null;
-    }
-
-    const isAuthenticated = this.storageAdapter.isAuthenticated;
-    let replId = this.storageAdapter.getActiveReplId();
-    console.log(
-      "[Service.initializeRepl] Active REPL from localStorage:",
-      replId,
-      "isAuthenticated:",
-      isAuthenticated,
-    );
-
-    // Helper to check if code is real (not default)
-    const isRealCode = (code: string) => !code.includes("Welcome to StrudelLM");
-
-    // Check if the active REPL from localStorage actually exists with real code
-    if (replId) {
-      const repl = this.storageAdapter.getRepl(replId);
-      console.log(
-        "[Service.initializeRepl] REPL exists in storage:",
-        !!repl,
-        repl?.code?.substring(0, 50),
-      );
-      if (repl && isRealCode(repl.code)) {
-        // Found a valid REPL with real code
-        this.currentReplId = replId;
-        this.storageAdapter.setActiveReplId(replId);
-        if (this.editorInstance) {
-          this.setCode(repl.code);
-        }
-        return replId;
-      }
-      // REPL doesn't exist or only has default code
-      replId = null;
-    }
-
-    // If no valid active REPL, try to get one from storage with real code
-    const allRepls = this.storageAdapter.getAllRepls();
-    console.log(
-      "[Service.initializeRepl] All REPLs from storage:",
-      allRepls.length,
-    );
-
-    for (const replSummary of allRepls) {
-      const repl = this.storageAdapter.getRepl(replSummary.id);
-      if (repl && isRealCode(repl.code)) {
-        console.log(
-          "[Service.initializeRepl] Found REPL with real code:",
-          replSummary.id,
-          repl.code.substring(0, 50),
-        );
-        this.currentReplId = replSummary.id;
-        this.storageAdapter.setActiveReplId(replSummary.id);
-        if (this.editorInstance) {
-          this.setCode(repl.code);
-        }
-        return replSummary.id;
-      }
-    }
-
-    // No REPLs with real code found
-    // Use the first REPL if available (even with default code)
-    if (allRepls.length > 0) {
-      replId = allRepls[0].id;
-      console.log("[Service.initializeRepl] Using first REPL:", replId);
-      this.currentReplId = replId;
-      this.storageAdapter.setActiveReplId(replId);
-      // Also load the code into the editor
-      const repl = this.storageAdapter.getRepl(replId);
-      if (repl?.code && this.editorInstance) {
-        this.setCode(repl.code);
-      }
-      return replId;
-    }
-
-    // No REPLs at all - StrudelStorageSync will handle creating one if needed
-    console.log(
-      "[Service.initializeRepl] No REPLs found, waiting for StrudelStorageSync",
-    );
-    return null;
-  }
+  // Code persistence is now handled by StrudelStorageSync component
+  // which directly syncs editor state with localStorage
 
   // ============================================
   // State Change Callbacks
@@ -490,10 +221,7 @@ export class StrudelService {
     this._state = mergedState;
     this.stateChangeCallbacks.forEach((cb) => cb(mergedState));
 
-    // Auto-save on code change (skip during initialization)
-    if (!this.isInitializing) {
-      this.saveCode();
-    }
+    // Code persistence is now handled by StrudelStorageSync component
   }
 
   // ============================================
@@ -754,7 +482,9 @@ export class StrudelService {
     }
   }
 
-  fixTheme(): void {
+  async fixTheme(): Promise<void> {
+    const { setTheme } = await import("@strudel/draw");
+
     const themeSettings = {
       background: "var(--card-background)",
       foreground: "var(--card-foreground)",
@@ -784,6 +514,10 @@ export class StrudelService {
   }
 
   prebake = async (): Promise<void> => {
+    const { initAudioOnFirstClick } = await import("@strudel/webaudio");
+    const { evalScope } = await import("@strudel/core");
+    const { registerSynthSounds } = await import("@strudel/webaudio");
+
     initAudioOnFirstClick(); // needed to make the browser happy (don't await this here..)
 
     let totalWeight = 0;
@@ -853,6 +587,9 @@ export class StrudelService {
    */
   attach = async (container: HTMLElement): Promise<void> => {
     const { StrudelMirror } = await import("@strudel/codemirror");
+    const { transpiler } = await import("@strudel/transpiler");
+    const { webaudioOutput, getAudioContext } = await import("@strudel/webaudio");
+    const { getDrawContext } = await import("@strudel/draw");
 
     // If already attached to this container, do nothing
     if (this.containerElement === container && this.editorInstance) {
@@ -909,13 +646,7 @@ const keybindings = getKeybindings();
       // This is necessary because StrudelMirror doesn't sync initialCode to repl.state
       this.editorInstance.repl.setCode(currentCode);
 
-      // Load saved code for current REPL if we don't already have code
-      if (this.currentReplId && currentCode === DEFAULT_CODE) {
-        const savedCode = this.loadReplCode(this.currentReplId);
-        if (savedCode) {
-          this.setCode(savedCode);
-        }
-      }
+      // Code loading is now handled by StrudelStorageSync component
 
     } finally {
       this.isInitializing = false;

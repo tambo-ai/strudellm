@@ -7,14 +7,21 @@ import { createPortal } from "react-dom";
 
 interface AuthModalProps {
   onClose: () => void;
+  redirectTo?: string;
 }
 
-export function AuthModal({ onClose }: AuthModalProps) {
+export function AuthModal({ onClose, redirectTo }: AuthModalProps) {
   const [mounted, setMounted] = useState(false);
+  const [callbackURL, setCallbackURL] = useState("/");
 
   useEffect(() => {
     setMounted(true);
-  }, []);
+    // Use provided redirectTo, or capture current URL (path + search + hash)
+    const currentUrl =
+      redirectTo ||
+      window.location.pathname + window.location.search + window.location.hash;
+    setCallbackURL(currentUrl || "/");
+  }, [redirectTo]);
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -28,7 +35,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
     try {
       const result = await signIn.magicLink({
         email,
-        callbackURL: "/",
+        callbackURL,
       });
       if (result.error) {
         setError(result.error.message || "Failed to send magic link");
@@ -80,10 +87,35 @@ export function AuthModal({ onClose }: AuthModalProps) {
             <div className="flex items-center justify-center mb-4">
               <Mail className="w-10 h-10 text-muted-foreground" />
             </div>
-            <h2 className="text-xl font-semibold mb-2 text-center">Sign in</h2>
-            <p className="text-sm text-muted-foreground text-center mb-6">
-              Enter your email to receive a magic link
+            <h2 className="text-xl font-semibold mb-2 text-center">
+              Get Early Access
+            </h2>
+            <p className="text-sm text-muted-foreground text-center mb-4">
+              Sign up to be notified when we launch:
             </p>
+            <ul className="text-sm text-muted-foreground mb-6 space-y-1.5">
+              <li className="flex items-center gap-2">
+                <span className="text-primary">•</span> Unlimited conversations
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-primary">•</span> Save multiple songs
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-primary">•</span> Share songs with anyone
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-primary">•</span> Version history
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-primary">•</span> Export songs
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-primary">•</span> Upload your own samples
+              </li>
+              <li className="flex items-center gap-2 text-muted-foreground/70">
+                <span className="text-primary/70">•</span> and more...
+              </li>
+            </ul>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
@@ -110,12 +142,12 @@ export function AuthModal({ onClose }: AuthModalProps) {
                 className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
               >
                 {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                Send magic link
+                Notify me
               </button>
             </form>
 
             <p className="mt-4 text-center text-xs text-muted-foreground">
-              No password needed. We&apos;ll email you a link to sign in.
+              No password needed. We&apos;ll email you a link to confirm.
             </p>
           </>
         )}

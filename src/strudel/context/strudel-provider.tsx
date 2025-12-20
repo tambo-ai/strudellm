@@ -3,7 +3,6 @@
 import { useLoadingContext } from "@/components/loading/context";
 import { StrudelService } from "@/strudel/lib/service";
 import { StrudelReplState } from "@strudel/codemirror";
-import { ReplSummary } from "@/hooks/use-strudel-storage";
 import * as React from "react";
 
 type StrudelContextValue = {
@@ -13,16 +12,6 @@ type StrudelContextValue = {
   revertNotification: { id: number; message: string } | null;
   clearRevertNotification: () => void;
   setCode: (code: string, shouldPlay?: boolean) => void;
-  setThreadId: (threadId: string | null) => void;
-  setReplId: (replId: string) => void;
-  currentReplId: string | null;
-  createNewRepl: (code?: string) => string | null;
-  initializeRepl: () => string | null;
-  isThreadOnDifferentRepl: (threadId: string) => boolean;
-  getReplIdForThread: (threadId: string) => string | null;
-  allRepls: ReplSummary[];
-  getAllRepls: () => ReplSummary[];
-  deleteRepl: (replId: string) => void;
   isPlaying: boolean;
   hasUnevaluatedChanges: boolean;
   play: () => void;
@@ -31,7 +20,6 @@ type StrudelContextValue = {
   clearError: () => void;
   setRoot: (el: HTMLDivElement) => void;
   isReady: boolean;
-  isStorageLoaded: boolean;
   isAiUpdating: boolean;
   setIsAiUpdating: (value: boolean) => void;
 };
@@ -54,10 +42,6 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     isAiUpdatingRef.current = isAiUpdating;
   }, [isAiUpdating]);
-  const [allRepls, setAllRepls] = React.useState<ReplSummary[]>([]);
-  const [currentReplId, setCurrentReplId] = React.useState<string | null>(() =>
-    strudelService.getCurrentReplId(),
-  );
 
   React.useEffect(() => {
     const loadingUnsubscribe = strudelService.onLoadingProgress(
@@ -128,52 +112,6 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
-  const setThreadId = React.useCallback((threadId: string | null) => {
-    strudelService.setThreadId(threadId);
-  }, []);
-
-  const setReplId = React.useCallback((replId: string) => {
-    strudelService.setReplId(replId);
-    setCurrentReplId(replId);
-  }, []);
-
-  const createNewRepl = React.useCallback((code?: string) => {
-    const replId = strudelService.createNewRepl(code);
-    if (replId) {
-      setCurrentReplId(replId);
-    }
-    return replId;
-  }, []);
-
-  const initializeRepl = React.useCallback(() => {
-    const replId = strudelService.initializeRepl();
-    if (replId) {
-      setCurrentReplId(replId);
-    }
-    return replId;
-  }, []);
-
-  const isThreadOnDifferentRepl = React.useCallback((threadId: string) => {
-    return strudelService.isThreadOnDifferentRepl(threadId);
-  }, []);
-
-  const getReplIdForThread = React.useCallback((threadId: string) => {
-    return strudelService.getReplIdForThread(threadId);
-  }, []);
-
-  const getAllRepls = React.useCallback(() => {
-    const repls = strudelService.getAllRepls();
-    setAllRepls(repls);
-    return repls;
-  }, []);
-
-  const deleteRepl = React.useCallback((replId: string) => {
-    strudelService.deleteRepl(replId);
-    // Refresh the list after deletion
-    const repls = strudelService.getAllRepls();
-    setAllRepls(repls);
-  }, []);
-
   const clearRevertNotification = React.useCallback(() => {
     strudelService.clearRevertNotification();
   }, []);
@@ -199,16 +137,6 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
       isPlaying,
       hasUnevaluatedChanges,
       setCode,
-      setThreadId,
-      setReplId,
-      currentReplId,
-      createNewRepl,
-      initializeRepl,
-      isThreadOnDifferentRepl,
-      getReplIdForThread,
-      allRepls,
-      getAllRepls,
-      deleteRepl,
       play: async () => {
         try {
           await strudelService.play();
@@ -223,23 +151,12 @@ export function StrudelProvider({ children }: { children: React.ReactNode }) {
       clearError: strudelService.clearError,
       setRoot,
       isReady: strudelService.isReady,
-      isStorageLoaded: strudelService.isStorageLoaded,
       isAiUpdating,
       setIsAiUpdating,
     };
   }, [
     setRoot,
     setCode,
-    setThreadId,
-    setReplId,
-    currentReplId,
-    createNewRepl,
-    initializeRepl,
-    isThreadOnDifferentRepl,
-    getReplIdForThread,
-    allRepls,
-    getAllRepls,
-    deleteRepl,
     replState,
     isAiUpdating,
     clearRevertNotification,
