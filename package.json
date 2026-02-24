@@ -38,7 +38,7 @@
     "react-markdown": "^10.1.0",
     "recharts": "^3.5.1",
     "resend": "^6.6.0",
-    "streamdown": "^1.6.10",
+    "streamdown": "^2.1.0",
     "superdough": "^1.2.6",
     "zod": "^4.1.13"
   },
