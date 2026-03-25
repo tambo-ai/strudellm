@@ -7,9 +7,8 @@ import {
   getSafeContent,
 } from "@/lib/thread-hooks";
 import { cn } from "@/lib/utils";
-import type { TamboThreadMessage } from "@tambo-ai/react";
+import type { TamboThreadMessage, TamboToolUseContent, TamboComponentContent, ToolResultContent } from "@tambo-ai/react";
 import { useTambo } from "@tambo-ai/react";
-import type TamboAI from "@tambo-ai/typescript-sdk";
 import { cva, type VariantProps } from "class-variance-authority";
 import stringify from "json-stringify-pretty-compact";
 import { Check, ChevronDown, ExternalLink, Loader2, X } from "lucide-react";
@@ -78,15 +77,28 @@ const useMessageContext = () => {
 };
 
 /**
- * Get the tool call request from the message, or the component tool call request
+ * Get the first tool_use content block from the message
  *
- * @param message - The message to get the tool call request from
- * @returns The tool call request
+ * @param message - The message to get the tool use from
+ * @returns The first tool_use content block, or undefined
  */
-export function getToolCallRequest(
+export function getToolUseBlock(
   message: TamboThreadMessage,
-): TamboAI.ToolCallRequest | undefined {
-  return message.toolCallRequest ?? message.component?.toolCallRequest;
+): TamboToolUseContent | undefined {
+  return message.content?.find(
+    (block): block is TamboToolUseContent => block.type === "tool_use",
+  );
+}
+
+/**
+ * Get the first component content block from the message
+ */
+export function getComponentBlock(
+  message: TamboThreadMessage,
+): TamboComponentContent | undefined {
+  return message.content?.find(
+    (block): block is TamboComponentContent => block.type === "component",
+  );
 }
 
 // --- Sub-Components ---
@@ -132,11 +144,6 @@ const Message = React.forwardRef<HTMLDivElement, MessageProps>(
       () => ({ role, variant, isLoading, message }),
       [role, variant, isLoading, message],
     );
-
-    // Don't render tool response messages as they're shown in tool call dropdowns
-    if (message.role === "tool") {
-      return null;
-    }
 
     return (
       <MessageContext.Provider value={contextValue}>
@@ -302,7 +309,7 @@ const MessageContent = React.forwardRef<HTMLDivElement, MessageContentProps>(
             ) : (
               safeContent
             )}
-            {message.isCancelled && (
+            {!!message.metadata?.cancelled && (
               <span className="text-muted-foreground text-xs">cancelled</span>
             )}
           </div>
@@ -329,16 +336,15 @@ function getToolStatusMessage(
   message: TamboThreadMessage,
   isLoading: boolean | undefined,
 ) {
-  if (message.role !== "assistant" || !getToolCallRequest(message)) {
+  const toolUse = getToolUseBlock(message);
+  if (message.role !== "assistant" || !toolUse) {
     return null;
   }
 
   const toolCallMessage = isLoading
-    ? `Calling ${getToolCallRequest(message)?.toolName ?? "tool"}`
-    : `Called ${getToolCallRequest(message)?.toolName ?? "tool"}`;
-  const toolStatusMessage = isLoading
-    ? message.component?.statusMessage
-    : message.component?.completionStatusMessage;
+    ? `Calling ${toolUse.name ?? "tool"}`
+    : `Called ${toolUse.name ?? "tool"}`;
+  const toolStatusMessage = toolUse.statusMessage;
   return toolStatusMessage ?? toolCallMessage;
 }
 
@@ -351,37 +357,29 @@ const ToolcallInfo = React.forwardRef<HTMLDivElement, ToolcallInfoProps>(
   ({ className, markdown = true, ...props }, ref) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const { message, isLoading } = useMessageContext();
-    const { thread } = useTambo();
+    const { messages } = useTambo();
     const toolDetailsId = React.useId();
 
-    const associatedToolResponse = React.useMemo(() => {
-      if (!thread?.messages) return null;
-      const currentMessageIndex = thread.messages.findIndex(
-        (m: TamboThreadMessage) => m.id === message.id,
-      );
-      if (currentMessageIndex === -1) return null;
-      for (let i = currentMessageIndex + 1; i < thread.messages.length; i++) {
-        const nextMessage = thread.messages[i];
-        if (nextMessage.role === "tool") {
-          return nextMessage;
-        }
-        if (
-          nextMessage.role === "assistant" &&
-          getToolCallRequest(nextMessage)
-        ) {
-          break;
-        }
+    const toolUse = getToolUseBlock(message);
+
+    // Find the associated tool_result content block
+    const associatedToolResult = React.useMemo((): ToolResultContent | null => {
+      if (!toolUse || !messages) return null;
+      // Look for tool_result blocks that match this tool_use's id
+      for (const msg of messages) {
+        const resultBlock = msg.content?.find(
+          (block): block is ToolResultContent => block.type === "tool_result" && block.toolUseId === toolUse.id,
+        );
+        if (resultBlock) return resultBlock;
       }
       return null;
-    }, [message, thread?.messages]);
+    }, [toolUse, messages]);
 
-    if (message.role !== "assistant" || !getToolCallRequest(message)) {
+    if (message.role !== "assistant" || !toolUse) {
       return null;
     }
 
-    const toolCallRequest: TamboAI.ToolCallRequest | undefined =
-      getToolCallRequest(message);
-    const hasToolError = message.error;
+    const hasToolError = toolUse.hasCompleted === false && !isLoading;
 
     const toolStatusMessage = getToolStatusMessage(message, isLoading);
 
@@ -428,23 +426,23 @@ const ToolcallInfo = React.forwardRef<HTMLDivElement, ToolcallInfoProps>(
             )}
           >
             <span className="whitespace-pre-wrap pl-2">
-              tool: {toolCallRequest?.toolName}
+              tool: {toolUse.name}
             </span>
             <span className="whitespace-pre-wrap pl-2">
               parameters:{"\n"}
-              {stringify(keyifyParameters(toolCallRequest?.parameters))}
+              {stringify(toolUse.input)}
             </span>
             <SamplingSubThread parentMessageId={message.id} />
-            {associatedToolResponse && (
+            {associatedToolResult && (
               <div className="pl-2">
                 <span className="whitespace-pre-wrap">result:</span>
                 <div>
-                  {!associatedToolResponse.content ? (
+                  {!associatedToolResult.content ? (
                     <span className="text-muted-foreground italic">
                       Empty response
                     </span>
                   ) : (
-                    formatToolResult(associatedToolResponse.content, markdown)
+                    formatToolResult(associatedToolResult.content as TamboThreadMessage["content"], markdown)
                   )}
                 </div>
               </div>
@@ -470,15 +468,15 @@ const SamplingSubThread = ({
   parentMessageId: string;
   titleText?: string;
 }) => {
-  const { thread } = useTambo();
+  const { messages } = useTambo();
   const [isExpanded, setIsExpanded] = useState(false);
   const samplingDetailsId = React.useId();
 
   const childMessages = React.useMemo(() => {
-    return thread?.messages?.filter(
+    return messages?.filter(
       (m: TamboThreadMessage) => m.parentMessageId === parentMessageId,
     );
-  }, [thread?.messages, parentMessageId]);
+  }, [messages, parentMessageId]);
 
   if (!childMessages?.length) return null;
 
@@ -662,13 +660,6 @@ const ReasoningInfo = React.forwardRef<HTMLDivElement, ReasoningInfoProps>(
 
 ReasoningInfo.displayName = "ReasoningInfo";
 
-function keyifyParameters(parameters: TamboAI.ToolCallParameter[] | undefined) {
-  if (!parameters) return;
-  return Object.fromEntries(
-    parameters.map((p) => [p.parameterName, p.parameterValue]),
-  );
-}
-
 /**
  * Formats the reasoning duration in a human-readable format
  * @param durationMS - The duration in milliseconds
@@ -780,10 +771,12 @@ const MessageRenderedComponentArea = React.forwardRef<
     };
   }, []);
 
+  const componentBlock = getComponentBlock(message);
+
   if (
-    !message.renderedComponent ||
+    !componentBlock?.renderedComponent ||
     role !== "assistant" ||
-    message.isCancelled
+    message.metadata?.cancelled
   ) {
     return null;
   }
@@ -805,7 +798,7 @@ const MessageRenderedComponentArea = React.forwardRef<
                     new CustomEvent("tambo:showComponent", {
                       detail: {
                         messageId: message.id,
-                        component: message.renderedComponent,
+                        component: componentBlock.renderedComponent,
                       },
                     }),
                   );
@@ -819,7 +812,7 @@ const MessageRenderedComponentArea = React.forwardRef<
             </button>
           </div>
         ) : (
-          <div className="w-full pt-2 px-2">{message.renderedComponent}</div>
+          <div className="w-full pt-2 px-2">{componentBlock.renderedComponent}</div>
         ))}
     </div>
   );

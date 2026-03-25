@@ -1,33 +1,22 @@
 "use client";
 
-import { MessageGenerationStage } from "@/components/tambo/message-generation-stage";
 import {
   Tooltip,
   TooltipProvider,
 } from "@/components/tambo/suggestions-tooltip";
 import { cn } from "@/lib/utils";
-import type { Suggestion, TamboThread } from "@tambo-ai/react";
-import { useTambo, useTamboSuggestions } from "@tambo-ai/react";
+import type { Suggestion } from "@tambo-ai/react";
+import { useTambo, useTamboSuggestions, type AcceptSuggestionOptions } from "@tambo-ai/react";
 import { Loader2Icon } from "lucide-react";
 import * as React from "react";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
-/**
- * @typedef MessageSuggestionsContextValue
- * @property {Array} suggestions - Array of suggestion objects
- * @property {string|null} selectedSuggestionId - ID of the currently selected suggestion
- * @property {function} accept - Function to accept a suggestion
- * @property {boolean} isGenerating - Whether suggestions are being generated
- * @property {Error|null} error - Any error from generation
- * @property {object} thread - The current Tambo thread
- */
 interface MessageSuggestionsContextValue {
   suggestions: Suggestion[];
   selectedSuggestionId: string | null;
-  accept: (options: { suggestion: Suggestion }) => void;
+  accept: (options: AcceptSuggestionOptions) => void;
   isGenerating: boolean;
   error: Error | null;
-  thread: TamboThread;
   isMac: boolean;
 }
 
@@ -94,24 +83,28 @@ const MessageSuggestions = React.forwardRef<
     },
     ref,
   ) => {
-    const { thread } = useTambo();
+    const { messages } = useTambo();
     const {
       suggestions: generatedSuggestions,
       selectedSuggestionId,
       accept,
-      generateResult: { isPending: isGenerating, error },
+      isGenerating,
+      error,
     } = useTamboSuggestions({ maxSuggestions });
 
     // Combine initial and generated suggestions, but only use initial ones when thread is empty
     const suggestions = React.useMemo(() => {
       // Only use pre-seeded suggestions if thread is empty
-      if (!thread?.messages?.length && initialSuggestions.length > 0) {
-        return initialSuggestions.slice(0, maxSuggestions);
-      }
-      // Otherwise use generated suggestions
-      return generatedSuggestions;
+      const raw = !messages?.length && initialSuggestions.length > 0
+        ? initialSuggestions.slice(0, maxSuggestions)
+        : generatedSuggestions;
+      // Ensure detailedSuggestion is populated (SDK accept() throws if empty)
+      return raw.map((s) => ({
+        ...s,
+        detailedSuggestion: s.detailedSuggestion || s.title,
+      }));
     }, [
-      thread?.messages?.length,
+      messages?.length,
       generatedSuggestions,
       initialSuggestions,
       maxSuggestions,
@@ -120,10 +113,6 @@ const MessageSuggestions = React.forwardRef<
     const isMac =
       typeof navigator !== "undefined" && navigator.platform.startsWith("Mac");
 
-    // Track the last AI message ID to detect new messages
-    const lastAiMessageIdRef = useRef<string | null>(null);
-    const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
     const contextValue = React.useMemo(
       () => ({
         suggestions,
@@ -131,7 +120,6 @@ const MessageSuggestions = React.forwardRef<
         accept,
         isGenerating,
         error,
-        thread,
         isMac,
       }),
       [
@@ -140,34 +128,9 @@ const MessageSuggestions = React.forwardRef<
         accept,
         isGenerating,
         error,
-        thread,
         isMac,
       ],
     );
-
-    // Find the last AI message
-    const lastAiMessage = thread?.messages
-      ? [...thread.messages].reverse().find((msg) => msg.role === "assistant")
-      : null;
-
-    // When a new AI message appears, update the reference
-    useEffect(() => {
-      if (lastAiMessage && lastAiMessage.id !== lastAiMessageIdRef.current) {
-        lastAiMessageIdRef.current = lastAiMessage.id;
-
-        if (loadingTimeoutRef.current) {
-          clearTimeout(loadingTimeoutRef.current);
-        }
-
-        loadingTimeoutRef.current = setTimeout(() => {}, 5000);
-      }
-
-      return () => {
-        if (loadingTimeoutRef.current) {
-          clearTimeout(loadingTimeoutRef.current);
-        }
-      };
-    }, [lastAiMessage, suggestions.length]);
 
     // Handle keyboard shortcuts for selecting suggestions
     useEffect(() => {
@@ -196,7 +159,7 @@ const MessageSuggestions = React.forwardRef<
     }, [suggestions, accept, isMac]);
 
     // If we have no messages yet and no initial suggestions, render nothing
-    if (!thread?.messages?.length && initialSuggestions.length === 0) {
+    if (!messages?.length && initialSuggestions.length === 0) {
       return null;
     }
 
@@ -241,18 +204,14 @@ const MessageSuggestionsStatus = React.forwardRef<
   HTMLDivElement,
   MessageSuggestionsStatusProps
 >(({ className, ...props }, ref) => {
-  const { error, isGenerating, thread } = useMessageSuggestionsContext();
+  const { error, isGenerating } = useMessageSuggestionsContext();
 
   return (
     <div
       ref={ref}
       className={cn(
         "p-2 rounded-md text-sm bg-transparent",
-        !error &&
-          !isGenerating &&
-          (!thread?.generationStage || thread.generationStage === "COMPLETE")
-          ? "p-0 min-h-0 mb-0"
-          : "",
+        !error && !isGenerating ? "p-0 min-h-0 mb-0" : "",
         className,
       )}
       data-slot="message-suggestions-status"
@@ -265,11 +224,9 @@ const MessageSuggestionsStatus = React.forwardRef<
         </div>
       )}
 
-      {/* Always render a container for generation stage to prevent layout shifts */}
+      {/* Generation loading state */}
       <div className="generation-stage-container">
-        {thread?.generationStage && thread.generationStage !== "COMPLETE" ? (
-          <MessageGenerationStage />
-        ) : isGenerating ? (
+        {isGenerating ? (
           <div className="flex items-center gap-2 text-muted-foreground">
             <Loader2Icon className="h-4 w-4 animate-spin" />
             <p>Generating suggestions...</p>

@@ -41,8 +41,8 @@ import * as React from "react";
  */
 export interface MessageThreadFullProps
   extends React.HTMLAttributes<HTMLDivElement> {
-  /** Optional context key for the thread */
-  contextKey?: string;
+  /** Optional user key for the thread */
+  userKey?: string;
   /**
    * Controls the visual styling of messages in the thread.
    * Possible values include: "default", "compact", etc.
@@ -81,14 +81,14 @@ const defaultSuggestions: Suggestion[] = [
 export const MessageThreadFull = React.forwardRef<
   HTMLDivElement,
   MessageThreadFullProps
->(({ className, contextKey, variant, initialSuggestions, ...props }, ref) => {
+>(({ className, userKey, variant, initialSuggestions, ...props }, ref) => {
   const { containerRef, historyPosition } = useThreadContainerContext();
   const mergedRef = useMergeRefs<HTMLDivElement | null>(ref, containerRef);
 
   const suggestions = initialSuggestions ?? defaultSuggestions;
 
   const threadHistorySidebar = (
-    <ThreadHistory contextKey={contextKey} position={historyPosition}>
+    <ThreadHistory userKey={userKey} position={historyPosition}>
       <ThreadHistoryHeader />
       <ThreadHistoryNewButton />
       <ThreadHistorySearch />
@@ -120,7 +120,7 @@ export const MessageThreadFull = React.forwardRef<
 
         {/* Message input */}
         <div className="px-4 pb-4">
-          <MessageInput contextKey={contextKey}>
+          <MessageInput>
             <MessageInputTextarea placeholder="Type your message or paste images..." />
             <MessageInputToolbar>
               <MessageInputFileButton />

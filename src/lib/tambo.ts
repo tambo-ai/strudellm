@@ -13,7 +13,7 @@
  * Read more about Tambo at https://tambo.co/docs
  */
 
-import type { TamboComponent, TamboTool } from "@tambo-ai/react";
+import type { TamboComponent } from "@tambo-ai/react";
 import { validateAndUpdateRepl } from "@/strudel/tools/validateAndUpdateRepl";
 import { listSamples } from "@/strudel/tools/listSamples";
 import {
@@ -38,7 +38,7 @@ import {
  *
  * This array contains all the Tambo tools that are registered for use within the application.
  */
-export const tools: TamboTool[] = [validateAndUpdateRepl, listSamples];
+export const tools = [validateAndUpdateRepl, listSamples];
 
 /**
  * components

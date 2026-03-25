@@ -7,7 +7,6 @@ import {
   DEFAULT_KEYBINDINGS,
 } from "@/lib/editor-preferences";
 import { StrudelService } from "@/strudel/lib/service";
-import { useTamboStreamStatus } from "@tambo-ai/react";
 import * as React from "react";
 import { z } from "zod/v3";
 
@@ -31,13 +30,6 @@ export const KeybindingsPicker = React.forwardRef<
   HTMLDivElement,
   KeybindingsPickerProps
 >(({ keybindings }, ref) => {
-  const { streamStatus, propStatus } =
-    useTamboStreamStatus<KeybindingsPickerProps>();
-
-  // Track if we've done initial setup
-  const initializedRef = React.useRef(false);
-
-  // Local state for selected keybindings and pending change
   const [selectedKeybindings, setSelectedKeybindings] = React.useState<string>(
     DEFAULT_KEYBINDINGS,
   );
@@ -46,27 +38,15 @@ export const KeybindingsPicker = React.forwardRef<
   >(null);
   const [isApplying, setIsApplying] = React.useState(false);
 
-  // Initialize from localStorage and treat any AI prop as a pending selection.
+  // On mount: read from localStorage, treat AI prop as pending selection
   React.useEffect(() => {
-    if (initializedRef.current) return;
-    initializedRef.current = true;
+    const saved = getKeybindings() || DEFAULT_KEYBINDINGS;
+    setSelectedKeybindings(saved);
 
-    const savedKeybindings = getKeybindings();
-    const initialKeybindings = savedKeybindings || DEFAULT_KEYBINDINGS;
-    setSelectedKeybindings(initialKeybindings);
-
-    if (keybindings && keybindings !== initialKeybindings) {
+    if (keybindings && keybindings !== saved) {
       setPendingKeybindings(keybindings);
     }
   }, [keybindings]);
-
-  // Handle AI prop changes after initial mount
-  React.useEffect(() => {
-    if (!initializedRef.current) return;
-    if (keybindings && keybindings !== selectedKeybindings) {
-      setPendingKeybindings(keybindings);
-    }
-  }, [keybindings, selectedKeybindings]);
 
   const handleKeybindingsSelect = (value: string) => {
     setPendingKeybindings(value);
@@ -86,23 +66,9 @@ export const KeybindingsPicker = React.forwardRef<
     }
   };
 
-  const isStreaming = streamStatus.isStreaming;
   const currentSelection = pendingKeybindings || selectedKeybindings;
   const hasChanges =
     pendingKeybindings !== null && pendingKeybindings !== selectedKeybindings;
-
-  if (streamStatus.isPending) {
-    return (
-      <div
-        ref={ref}
-        className="w-full rounded-lg border border-border bg-card p-4"
-      >
-        <div className="text-sm text-muted-foreground animate-pulse">
-          Loading keybindings picker...
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div
@@ -110,14 +76,7 @@ export const KeybindingsPicker = React.forwardRef<
       className="w-full rounded-lg border border-border bg-card p-4 space-y-4"
     >
       {/* Header */}
-      <h3
-        className={cn(
-          "text-sm font-medium",
-          propStatus.keybindings?.isStreaming && "animate-pulse",
-        )}
-      >
-        Keybindings
-      </h3>
+      <h3 className="text-sm font-medium">Keybindings</h3>
 
       {/* Keybindings options */}
       <div className="flex flex-wrap gap-2">
@@ -127,7 +86,7 @@ export const KeybindingsPicker = React.forwardRef<
             <button
               key={option.value}
               onClick={() => handleKeybindingsSelect(option.value)}
-              disabled={isStreaming || isApplying}
+              disabled={isApplying}
               className={cn(
                 "px-3 py-1.5 rounded-md text-sm border transition-all",
                 "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1",
@@ -141,18 +100,13 @@ export const KeybindingsPicker = React.forwardRef<
             </button>
           );
         })}
-        {propStatus.keybindings?.isStreaming && (
-          <span className="px-3 py-1.5 text-sm text-muted-foreground animate-pulse">
-            ...
-          </span>
-        )}
       </div>
 
       {/* Apply button */}
       <div className="flex justify-end">
         <button
           onClick={handleApplyAndRestart}
-          disabled={!hasChanges || isStreaming || isApplying}
+          disabled={!hasChanges || isApplying}
           className={cn(
             "px-4 py-2 rounded-md text-sm font-medium transition-all",
             "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1",
@@ -170,12 +124,6 @@ export const KeybindingsPicker = React.forwardRef<
       <p className="text-xs text-muted-foreground">
         Changing keybindings requires restarting the editor runtime.
       </p>
-
-      {streamStatus.isError && streamStatus.streamError && (
-        <div className="pt-3 text-xs text-destructive">
-          Error: {streamStatus.streamError.message}
-        </div>
-      )}
     </div>
   );
 });

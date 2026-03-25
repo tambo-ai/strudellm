@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import {
   useIsTamboTokenUpdating,
   useTamboContextAttachment,
-  useTamboThread,
+  useTambo,
   useTamboThreadInput,
   type StagedImage,
 } from "@tambo-ai/react";
@@ -90,14 +90,10 @@ const messageInputVariants = cva("w-full", {
 interface MessageInputContextValue {
   value: string;
   setValue: (value: string) => void;
-  submit: (options: {
-    contextKey?: string;
-    streamResponse?: boolean;
-  }) => Promise<void>;
+  submit: (options?: { debug?: boolean }) => Promise<{ threadId: string | undefined }>;
   handleSubmit: (e: React.FormEvent) => Promise<void>;
   isPending: boolean;
   error: Error | null;
-  contextKey?: string;
   textareaRef: React.RefObject<HTMLTextAreaElement>;
   submitError: string | null;
   setSubmitError: React.Dispatch<React.SetStateAction<string | null>>;
@@ -134,8 +130,6 @@ const useMessageInputContext = () => {
  * Extends standard HTMLFormElement attributes.
  */
 export interface MessageInputProps extends React.HTMLAttributes<HTMLFormElement> {
-  /** The context key identifying which thread to send messages to. */
-  contextKey?: string;
   /** Optional styling variant for the input container. */
   variant?: VariantProps<typeof messageInputVariants>["variant"];
   /** Optional ref to forward to the textarea element. */
@@ -158,12 +152,11 @@ export interface MessageInputProps extends React.HTMLAttributes<HTMLFormElement>
  * ```
  */
 const MessageInput = React.forwardRef<HTMLFormElement, MessageInputProps>(
-  ({ children, className, contextKey, variant, ...props }, ref) => {
+  ({ children, className, variant, ...props }, ref) => {
     return (
       <MessageInputInternal
         ref={ref}
         className={className}
-        contextKey={contextKey}
         variant={variant}
         {...props}
       >
@@ -180,7 +173,7 @@ MessageInput.displayName = "MessageInput";
 const MessageInputInternal = React.forwardRef<
   HTMLFormElement,
   MessageInputProps
->(({ children, className, contextKey, variant, inputRef, ...props }, ref) => {
+>(({ children, className, variant, inputRef, ...props }, ref) => {
   const {
     value,
     setValue,
@@ -191,7 +184,7 @@ const MessageInputInternal = React.forwardRef<
     addImages,
     clearImages,
   } = useTamboThreadInput();
-  const { cancel } = useTamboThread();
+  const { cancelRun } = useTambo();
   const { clearContextAttachments } = useTamboContextAttachment();
   const [displayValue, setDisplayValue] = React.useState("");
   const [submitError, setSubmitError] = React.useState<string | null>(null);
@@ -225,10 +218,7 @@ const MessageInputInternal = React.forwardRef<
       }
 
       try {
-        await submit({
-          contextKey,
-          streamResponse: true,
-        });
+        await submit();
         setValue("");
         // Clear context attachments after successful submit
         clearContextAttachments();
@@ -250,8 +240,8 @@ const MessageInputInternal = React.forwardRef<
             : errorMessage || "Failed to send message. Please try again.",
         );
 
-        // Cancel the thread to reset loading state
-        await cancel();
+        // Cancel the run to reset loading state
+        await cancelRun();
       } finally {
         setIsSubmitting(false);
       }
@@ -259,11 +249,10 @@ const MessageInputInternal = React.forwardRef<
     [
       value,
       submit,
-      contextKey,
       setValue,
       setDisplayValue,
       setSubmitError,
-      cancel,
+      cancelRun,
       isSubmitting,
       images,
       clearImages,
@@ -342,7 +331,6 @@ const MessageInputInternal = React.forwardRef<
       handleSubmit,
       isPending: isPending ?? isSubmitting,
       error,
-      contextKey,
       textareaRef: inputRef ?? textareaRef,
       submitError,
       setSubmitError,
@@ -357,7 +345,6 @@ const MessageInputInternal = React.forwardRef<
       isPending,
       isSubmitting,
       error,
-      contextKey,
       inputRef,
       textareaRef,
       submitError,
@@ -456,7 +443,7 @@ const MessageInputTextarea = ({
 }: MessageInputTextareaProps) => {
   const { value, setValue, textareaRef, handleSubmit } =
     useMessageInputContext();
-  const { isIdle } = useTamboThread();
+  const { isIdle } = useTambo();
   const { addImage } = useTamboThreadInput();
   const isUpdatingToken = useIsTamboTokenUpdating();
   const isPending = !isIdle;
@@ -552,13 +539,13 @@ const MessageInputSubmitButton = React.forwardRef<
   MessageInputSubmitButtonProps
 >(({ className, children, ...props }, ref) => {
   const { isPending, value } = useMessageInputContext();
-  const { cancel } = useTamboThread();
+  const { cancelRun } = useTambo();
   const isUpdatingToken = useIsTamboTokenUpdating();
 
   const handleCancel = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    await cancel();
+    await cancelRun();
   };
 
   const buttonClasses = cn(
@@ -635,7 +622,7 @@ const MessageInputNewThreadButton = React.forwardRef<
   HTMLButtonElement,
   MessageInputNewThreadButtonProps
 >(({ className, children, onNewThread, ...props }, ref) => {
-  const { startNewThread } = useTamboThread();
+  const { startNewThread } = useTambo();
   const isUpdatingToken = useIsTamboTokenUpdating();
 
   const handleNewThread = async (e: React.MouseEvent) => {
@@ -1130,15 +1117,12 @@ const MessageInputContextAttachments = React.forwardRef<
           key={attachment.id}
           className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 text-sm border border-amber-500/30"
         >
-          {attachment.icon && (
-            <span className="flex-shrink-0">{attachment.icon}</span>
-          )}
-          <span className="truncate max-w-[150px]">{attachment.name}</span>
+          <span className="truncate max-w-[150px]">{attachment.displayName ?? attachment.type ?? "attachment"}</span>
           <button
             type="button"
             onClick={() => removeContextAttachment(attachment.id)}
             className="ml-1 hover:text-amber-900 dark:hover:text-amber-200 transition-colors"
-            aria-label={`Remove ${attachment.name}`}
+            aria-label={`Remove ${attachment.displayName ?? "attachment"}`}
           >
             <X className="w-3 h-3" />
           </button>

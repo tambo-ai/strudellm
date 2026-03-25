@@ -1,4 +1,4 @@
-import { TamboTool } from "@tambo-ai/react";
+import { defineTool } from "@tambo-ai/react";
 import { z } from "zod/v3";
 
 /**
@@ -7,13 +7,13 @@ import { z } from "zod/v3";
  * Lists all available samples and sounds that can be used in Strudel patterns.
  * Queries the runtime soundMap to show exactly what's loaded.
  */
-export const listSamples: TamboTool = {
+export const listSamples = defineTool({
   name: "listSamples",
   description:
     "List all available samples and sounds. Use this to discover what instruments, drum machines, and sounds are available. You can filter by category or search for specific sounds.",
-  tool: async (
-    category?: string
-  ): Promise<string> => {
+  tool: async ({
+    category,
+  }): Promise<string> => {
     // Import soundMap from superdough at runtime
     const { soundMap } = await import("superdough");
 
@@ -103,16 +103,10 @@ export const listSamples: TamboTool = {
 
     return output.join('\n');
   },
-  toolSchema: z
-    .function()
-    .args(
-      z.string().optional().describe(
-        "Optional category to filter by (synths, drums, instruments, soundfonts, samples) or a search term to find specific sounds."
-      ),
-    )
-    .returns(
-      z.promise(
-        z.string()
-      ).describe("A formatted list of available sounds")
+  inputSchema: z.object({
+    category: z.string().optional().describe(
+      "Optional category to filter by (synths, drums, instruments, soundfonts, samples) or a search term to find specific sounds."
     ),
-};
+  }),
+  outputSchema: z.string().describe("A formatted list of available sounds"),
+});
