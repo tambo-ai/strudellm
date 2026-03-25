@@ -1,5 +1,5 @@
 import { StrudelService } from "@/strudel/lib/service";
-import { TamboTool } from "@tambo-ai/react";
+import { defineTool } from "@tambo-ai/react";
 import { z } from "zod/v3";
 
 const service = StrudelService.instance();
@@ -155,13 +155,11 @@ async function validateSamples(
  * Validates Strudel code by evaluating it, then updates the REPL if valid.
  * If the code contains errors, the tool throws an error so the AI can fix it.
  */
-export const validateAndUpdateRepl: TamboTool = {
+export const validateAndUpdateRepl = defineTool({
   name: "updateRepl",
   description:
     "Update the Strudel REPL with new pattern code. The code is validated by running it through Strudel's evaluator first. IMPORTANT: If success is false, you MUST immediately call this tool again with corrected code that fixes the error - do not ask the user or wait. The error message tells you exactly what went wrong. Common fixes: use listSamples to find valid sample names, fix syntax errors, ensure patterns return valid Strudel expressions. Make sure the code and sequences are in the same key/scale and don't produce anything that will sound dissonant.",
-  tool: async (
-    code: string,
-  ): Promise<{ success: boolean; code?: string; error?: string }> => {
+  tool: async ({ code }) => {
     await service.init();
 
     // First check for missing samples before evaluating
@@ -192,22 +190,16 @@ export const validateAndUpdateRepl: TamboTool = {
 
     return result;
   },
-  toolSchema: z
-    .function()
-    .args(
-      z
-        .string()
-        .describe(
-          "The Strudel/Tidal pattern code to evaluate and display. Examples: s('bd sd') for drums, note('c3 e3 g3') for melodies, stack() for layering patterns.",
-        ),
-    )
-    .returns(
-      z.promise(
-        z.object({
-          success: z.boolean(),
-          code: z.string().optional(),
-          error: z.string().optional(),
-        }),
+  inputSchema: z.object({
+    code: z
+      .string()
+      .describe(
+        "The Strudel/Tidal pattern code to evaluate and display. Examples: s('bd sd') for drums, note('c3 e3 g3') for melodies, stack() for layering patterns.",
       ),
-    ),
-};
+  }),
+  outputSchema: z.object({
+    success: z.boolean(),
+    code: z.string().optional(),
+    error: z.string().optional(),
+  }),
+});

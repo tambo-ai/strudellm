@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
   type TamboThread,
-  useTamboThread,
+  useTambo,
   useTamboThreadList,
 } from "@tambo-ai/react";
 import {
@@ -23,22 +23,22 @@ import { ThreadSwitchDialog } from "./thread-switch-dialog";
  * Context for sharing thread history state and functions
  */
 interface ThreadHistoryContextValue {
-  threads: { items?: TamboThread[] } | null | undefined;
+  threads: { threads?: TamboThread[] } | null | undefined;
   isLoading: boolean;
   error: Error | null;
   refetch: () => Promise<unknown>;
-  currentThread: TamboThread;
-  switchCurrentThread: (threadId: string) => void;
+  currentThread: TamboThread | undefined;
+  switchThread: (threadId: string) => void;
   startNewThread: () => void;
   searchQuery: string;
   setSearchQuery: React.Dispatch<React.SetStateAction<string>>;
   isCollapsed: boolean;
   setIsCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
   onThreadChange?: () => void;
-  contextKey?: string;
+  userKey?: string;
   position?: "left" | "right";
-  updateThreadName: (newName: string, threadId?: string) => Promise<void>;
-  generateThreadName: (threadId: string) => Promise<TamboThread>;
+  updateThreadName: (threadId: string, name: string) => Promise<void>;
+  generateThreadName: (threadId: string) => Promise<void>;
 }
 
 const ThreadHistoryContext =
@@ -58,7 +58,7 @@ const useThreadHistoryContext = () => {
  * Root component that provides context for thread history
  */
 interface ThreadHistoryProps extends React.HTMLAttributes<HTMLDivElement> {
-  contextKey?: string;
+  userKey?: string;
   onThreadChange?: () => void;
   children?: React.ReactNode;
   defaultCollapsed?: boolean;
@@ -69,7 +69,7 @@ const ThreadHistory = React.forwardRef<HTMLDivElement, ThreadHistoryProps>(
   (
     {
       className,
-      contextKey,
+      userKey,
       onThreadChange,
       defaultCollapsed = true,
       position = "left",
@@ -87,15 +87,24 @@ const ThreadHistory = React.forwardRef<HTMLDivElement, ThreadHistoryProps>(
       isLoading,
       error,
       refetch,
-    } = useTamboThreadList({ contextKey });
+    } = useTamboThreadList({ userKey });
 
     const {
-      switchCurrentThread,
+      switchThread,
       startNewThread,
-      thread: currentThread,
+      thread: threadState,
       updateThreadName,
-      generateThreadName,
-    } = useTamboThread();
+      client,
+    } = useTambo();
+
+    const currentThread = threadState?.thread;
+
+    const generateThreadName = React.useCallback(
+      async (threadId: string) => {
+        await client.beta.threads.generateName(threadId);
+      },
+      [client],
+    );
 
     // Update CSS variable when sidebar collapses/expands
     React.useEffect(() => {
@@ -120,14 +129,14 @@ const ThreadHistory = React.forwardRef<HTMLDivElement, ThreadHistoryProps>(
         error,
         refetch,
         currentThread,
-        switchCurrentThread,
+        switchThread,
         startNewThread,
         searchQuery,
         setSearchQuery,
         isCollapsed,
         setIsCollapsed,
         onThreadChange,
-        contextKey,
+        userKey,
         position,
         updateThreadName,
         generateThreadName,
@@ -138,12 +147,12 @@ const ThreadHistory = React.forwardRef<HTMLDivElement, ThreadHistoryProps>(
         error,
         refetch,
         currentThread,
-        switchCurrentThread,
+        switchThread,
         startNewThread,
         searchQuery,
         isCollapsed,
         onThreadChange,
-        contextKey,
+        userKey,
         position,
         updateThreadName,
         generateThreadName,
@@ -376,14 +385,14 @@ const ThreadHistoryList = React.forwardRef<
     isCollapsed,
     searchQuery,
     currentThread,
-    switchCurrentThread,
+    switchThread,
     onThreadChange,
     updateThreadName,
     generateThreadName,
     refetch,
   } = useThreadHistoryContext();
 
-  const { isIdle, cancel } = useTamboThread();
+  const { isIdle, cancelRun } = useTambo();
 
   const [editingThread, setEditingThread] = React.useState<TamboThread | null>(
     null,
@@ -436,10 +445,10 @@ const ThreadHistoryList = React.forwardRef<
     // While collapsed we do not need the list, avoid extra work.
     if (isCollapsed) return [];
 
-    if (!threads?.items) return [];
+    if (!threads?.threads) return [];
 
     const query = searchQuery.toLowerCase();
-    return threads.items.filter((thread: TamboThread) => {
+    return threads.threads.filter((thread: TamboThread) => {
       const nameMatches = thread.name?.toLowerCase().includes(query) ?? false;
       const idMatches = thread.id.toLowerCase().includes(query);
 
@@ -458,7 +467,7 @@ const ThreadHistoryList = React.forwardRef<
     }
 
     try {
-      switchCurrentThread(threadId);
+      switchThread(threadId);
       onThreadChange?.();
     } catch (error) {
       console.error("Failed to switch thread:", error);
@@ -470,9 +479,9 @@ const ThreadHistoryList = React.forwardRef<
 
     try {
       // Cancel the current generation
-      await cancel();
+      await cancelRun();
       // Then switch threads
-      switchCurrentThread(pendingThreadId);
+      switchThread(pendingThreadId);
       onThreadChange?.();
     } catch (error) {
       console.error("Failed to switch thread:", error);
@@ -506,7 +515,7 @@ const ThreadHistoryList = React.forwardRef<
     if (!editingThread) return;
 
     try {
-      await updateThreadName(newName, editingThread.id);
+      await updateThreadName(editingThread.id, newName);
       await refetch();
       setEditingThread(null);
     } catch (error) {

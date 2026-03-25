@@ -2,8 +2,8 @@ import { cn } from "@/lib/utils";
 import { useStrudel } from "@/strudel/context/strudel-provider";
 import { isSampleErrorMessage } from "@/strudel/lib/errors";
 import {
+  useTambo,
   useTamboContextAttachment,
-  useTamboThread,
   useTamboThreadInput,
 } from "@tambo-ai/react";
 import { Play, Square, RotateCcw, BotIcon, Info, AlertCircle } from "lucide-react";
@@ -54,11 +54,16 @@ function replaceStrudelErrorContextAttachment(
   metadata: StrudelErrorAttachmentMetadata,
 ): void {
   const existingErrors = api.attachments.filter(
-    (a) => a.metadata?.kind === "strudel_error",
+    (a) => a.type === "strudel_error",
   );
-  const alreadyAttached = existingErrors.some(
-    (a) => a.metadata?.attachmentKey === metadata.attachmentKey,
-  );
+  const contextJson = JSON.stringify(metadata);
+  const alreadyAttached = existingErrors.some((a) => {
+    try {
+      return JSON.parse(a.context)?.attachmentKey === metadata.attachmentKey;
+    } catch {
+      return false;
+    }
+  });
 
   if (alreadyAttached) return;
 
@@ -67,12 +72,9 @@ function replaceStrudelErrorContextAttachment(
   }
 
   api.addContextAttachment({
-    name: "Strudel Error",
-    icon: <AlertCircle className="w-3 h-3" />,
-    metadata: {
-      kind: "strudel_error",
-      ...metadata,
-    },
+    displayName: "Strudel Error",
+    context: contextJson,
+    type: "strudel_error",
   });
 }
 
@@ -91,7 +93,7 @@ export function StrudelStatusBar() {
     revertNotification,
     clearRevertNotification,
   } = useStrudel();
-  const { startNewThread } = useTamboThread();
+  const { startNewThread } = useTambo();
   const { setValue, value } = useTamboThreadInput();
   const { attachments, addContextAttachment, removeContextAttachment } =
     useTamboContextAttachment();

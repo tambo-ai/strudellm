@@ -52,9 +52,9 @@ export const McpPromptButton = React.forwardRef<
   React.useEffect(() => {
     if (promptData && selectedPromptName) {
       // Extract the text from the prompt messages
-      const promptText = promptData.messages
+      const promptText = (promptData.messages ?? [])
         .map((msg) => {
-          if (msg.content.type === "text") {
+          if (msg?.content?.type === "text") {
             return msg.content.text;
           }
           return "";
@@ -224,7 +224,7 @@ const ResourceCombobox: React.FC<ResourceComboboxProps> = ({
           ) : (
             filteredResources.map((resourceEntry) => (
               <DropdownMenu.Item
-                key={`${resourceEntry.server.url}-${resourceEntry.resource.uri}`}
+                key={`${resourceEntry.server?.url}-${resourceEntry.resource.uri}`}
                 className="relative flex cursor-pointer select-none items-start flex-col rounded-sm px-2 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 focus:bg-accent focus:text-accent-foreground"
                 onSelect={() => {
                   onSelectResource(resourceEntry.resource.uri);
