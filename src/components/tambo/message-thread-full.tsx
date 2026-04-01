@@ -61,18 +61,21 @@ const defaultSuggestions: Suggestion[] = [
   {
     id: "suggestion-1",
     title: "Get started",
+    description: "What can you help me with?",
     detailedSuggestion: "What can you help me with?",
     messageId: "welcome-query",
   },
   {
     id: "suggestion-2",
     title: "Learn more",
+    description: "Tell me about your capabilities.",
     detailedSuggestion: "Tell me about your capabilities.",
     messageId: "capabilities-query",
   },
   {
     id: "suggestion-3",
     title: "Examples",
+    description: "Show me some example queries I can try.",
     detailedSuggestion: "Show me some example queries I can try.",
     messageId: "examples-query",
   },

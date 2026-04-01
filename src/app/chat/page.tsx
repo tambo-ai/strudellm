@@ -207,18 +207,21 @@ const strudelSuggestions: Suggestion[] = [
   {
     id: "suggestion-1",
     title: "Simple beat",
+    description: "Create a simple drum beat with kick and snare",
     detailedSuggestion: "Create a simple drum beat with kick and snare",
     messageId: "simple-beat",
   },
   {
     id: "suggestion-2",
     title: "Melody",
+    description: "Generate a melodic pattern using notes and chords",
     detailedSuggestion: "Generate a melodic pattern using notes and chords",
     messageId: "melody",
   },
   {
     id: "suggestion-3",
     title: "Ambient",
+    description: "Create an ambient atmospheric soundscape",
     detailedSuggestion: "Create an ambient atmospheric soundscape",
     messageId: "ambient",
   },
