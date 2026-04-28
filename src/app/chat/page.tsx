@@ -98,6 +98,9 @@ const strudelContextHelper = () => {
 // Storage key for anonymous context
 const ANON_CONTEXT_KEY_STORAGE = "strudel-ai-context-key";
 
+// Prefix for per-thread Strudel code storage
+const THREAD_CODE_PREFIX = "strudel-thread-code-";
+
 const safeLocalStorageGetItem = (key: string): string | null => {
   if (typeof window === "undefined") return null;
   try {
@@ -231,6 +234,8 @@ function AppContent() {
   const [threadInitialized, setThreadInitialized] = React.useState(false);
   const [showBetaModal, setShowBetaModal] = React.useState(false);
   const lastUserKeyRef = React.useRef<string | null>(null);
+  // Track previous thread ID so we know when a thread switch has occurred.
+  const prevThreadIdRef = React.useRef<string | undefined>(undefined);
   const authIdentity = useAuthIdentity();
   const userKeyState = useContextKey({
     userId: authIdentity.userId,
@@ -245,11 +250,18 @@ function AppContent() {
   const {
     isReady: strudelIsReady,
     setIsAiUpdating,
+    setCode,
   } = useStrudel();
-  const { thread, messages, streamingState, isIdle, startNewThread, switchThread } =
+  const { thread, streamingState, isIdle, startNewThread, switchThread } =
     useTambo();
 
   const isGenerating = streamingState.status !== "idle";
+
+  // Derive current (real) thread ID – undefined for placeholder or when not yet loaded
+  const currentThreadId =
+    thread?.thread.id && thread.thread.id !== "placeholder"
+      ? thread.thread.id
+      : undefined;
 
   // Only query thread list when auth is fully ready
   const readyUserKey = userKeyAndIdentityReady
@@ -308,15 +320,76 @@ function AppContent() {
     lastUserKeyRef.current = currentKey;
   }, [userKeyState]);
 
-  // Thread/REPL association is no longer needed with single-REPL model
-  // All threads share the same REPL code
+  // Thread/REPL association is now per-thread: load stored code when switching threads.
+
+  // Load per-thread code from localStorage when switching to a different thread.
+  // On the very first thread load (prevThreadId === undefined) we let StrudelStorageSync
+  // handle the initial code; on subsequent switches we prefer the thread-specific key.
+  React.useEffect(() => {
+    if (!currentThreadId) return;
+    if (currentThreadId === prevThreadIdRef.current) return;
+
+    // Check for per-thread code; if absent, StrudelStorageSync will have already
+    // loaded the global fallback so there is nothing more to do.
+    try {
+      const threadCode = localStorage.getItem(
+        `${THREAD_CODE_PREFIX}${currentThreadId}`,
+      );
+      if (threadCode !== null) {
+        setCode(threadCode);
+      }
+      // Only mark as synced after a successful read so an unexpected localStorage
+      // error doesn't silently prevent the code from loading on the next switch.
+      prevThreadIdRef.current = currentThreadId;
+    } catch {
+      // localStorage may be unavailable in restricted environments
+    }
+  }, [currentThreadId, setCode]);
+
+  // Save per-thread code (debounced) whenever the REPL code changes.
+  React.useEffect(() => {
+    if (!currentThreadId) return;
+
+    // Capture the thread ID at effect-creation time so the save closure always
+    // writes to the correct thread even if a rapid switch triggers cleanup before
+    // the debounce timer fires.
+    const threadId = currentThreadId;
+    const service = StrudelService.instance();
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const unsubscribe = service.onStateChange((state) => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        if (state.code != null) {
+          try {
+            localStorage.setItem(
+              `${THREAD_CODE_PREFIX}${threadId}`,
+              state.code,
+            );
+          } catch {
+            // Ignore storage errors (private browsing, quota, etc.)
+          }
+        }
+      }, 1000);
+    });
+
+    return () => {
+      unsubscribe();
+      if (debounceTimer) clearTimeout(debounceTimer);
+    };
+  }, [currentThreadId]);
 
   // Wait for auth and user key to be fully ready before rendering UI
   if (!userKeyAndIdentityReady) {
     return <LoadingScreen />;
   }
 
-  if (isPending || !strudelIsReady || !thread) {
+  // During thread transitions `thread` is briefly undefined while the new thread's
+  // messages are being fetched. Once threadInitialized is true we keep the Frame
+  // rendered (preserving the thread history sidebar state) and only show an inline
+  // loading indicator in the messages area. Before threadInitialized we haven't
+  // called switchThread yet, so it is safe to show the full LoadingScreen.
+  if (isPending || !strudelIsReady || (!thread && !threadInitialized)) {
     return <LoadingScreen />;
   }
 
@@ -331,9 +404,17 @@ function AppContent() {
         <SidebarContent>
           {/* Messages */}
           <ScrollableMessageContainer className="flex-1 p-3">
-            <ThreadContent>
-              <ThreadContentMessages />
-            </ThreadContent>
+            {thread ? (
+              <ThreadContent>
+                <ThreadContentMessages />
+              </ThreadContent>
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-sm text-muted-foreground">
+                  Loading thread…
+                </p>
+              </div>
+            )}
           </ScrollableMessageContainer>
 
           {/* Suggestions */}
